@@ -1,0 +1,321 @@
+Project alimenta_plus {
+}
+
+Enum user_role {
+  administrator
+  manager
+  operator
+}
+
+Enum donor_type {
+  individual
+  company
+}
+
+Enum donation_status {
+  draft
+  received
+  in_triage
+  stored
+  available
+}
+
+Enum triage_status {
+  pending
+  approved
+  rejected
+}
+
+Enum route_status {
+  waiting
+  in_transit
+  completed
+  cancelled
+}
+
+Enum delivery_status {
+  waiting
+  in_transit
+  delivered
+  failed
+  cancelled
+}
+
+Enum stock_movement_type {
+  receipt
+  transfer
+  distribution
+  return
+  expiration_loss
+  other_loss
+  adjustment_in
+  adjustment_out
+}
+
+Table users {
+  id bigint [pk, increment]
+  name varchar(150) [not null]
+  email varchar(254) [not null, unique]
+  password_hash varchar(255) [not null]
+  role user_role [not null, default: 'operator']
+  is_active boolean [not null, default: true]
+  last_login_at timestamp
+  created_at timestamp [not null]
+  updated_at timestamp [not null]
+}
+
+Table donors {
+  id bigint [pk, increment]
+  type donor_type [not null]
+  name varchar(200) [not null]
+  tax_id varchar(14) [unique]
+  contact_name varchar(150)
+  email varchar(254)
+  phone varchar(30)
+  address text
+  is_active boolean [not null, default: true]
+  created_at timestamp [not null]
+  updated_at timestamp [not null]
+}
+
+Table product_categories {
+  id bigint [pk, increment]
+  name varchar(100) [not null, unique]
+}
+
+Table products {
+  id bigint [pk, increment]
+  category_id bigint [not null, ref: > product_categories.id]
+  name varchar(200) [not null]
+  unit varchar(20) [not null]
+  is_active boolean [not null, default: true]
+  created_at timestamp [not null]
+  updated_at timestamp [not null]
+}
+
+Table warehouses {
+  id bigint [pk, increment]
+  name varchar(100) [not null, unique]
+  address text
+  latitude decimal(9,6) [check: `latitude BETWEEN -90 AND 90`]
+  longitude decimal(9,6) [check: `longitude BETWEEN -180 AND 180`]
+  is_active boolean [not null, default: true]
+
+  checks {
+    `(latitude IS NULL AND longitude IS NULL) OR (latitude IS NOT NULL AND longitude IS NOT NULL)`
+  }
+}
+
+Table donations {
+  id bigint [pk, increment]
+  donor_id bigint [not null, ref: > donors.id]
+  status donation_status [not null, default: 'draft']
+  received_at timestamp
+  document_reference varchar(150)
+  document_path varchar(500)
+  notes text
+  created_by bigint [not null, ref: > users.id]
+  confirmed_by bigint [ref: > users.id]
+  confirmed_at timestamp
+  created_at timestamp [not null]
+  updated_at timestamp [not null]
+
+  checks {
+    `status = 'draft' OR received_at IS NOT NULL`
+    `(confirmed_at IS NULL AND confirmed_by IS NULL) OR (confirmed_at IS NOT NULL AND confirmed_by IS NOT NULL)`
+  }
+
+  indexes {
+    (donor_id, received_at)
+    (status, received_at)
+  }
+}
+
+Table inventory_batches {
+  id bigint [pk, increment]
+  donation_id bigint [ref: > donations.id]
+  product_id bigint [not null, ref: > products.id]
+  batch_code varchar(100) [not null]
+  received_quantity decimal(12,3) [not null, check: `received_quantity > 0`]
+  unit_weight_kg decimal(12,6) [not null, check: `unit_weight_kg > 0`]
+  expires_on date
+  triage_status triage_status [not null, default: 'pending']
+  triaged_by bigint [ref: > users.id]
+  triaged_at timestamp
+  triage_notes text
+  created_at timestamp [not null]
+  updated_at timestamp [not null]
+
+  checks {
+    `triage_status = 'pending' OR (triaged_by IS NOT NULL AND triaged_at IS NOT NULL)`
+  }
+
+  indexes {
+    donation_id
+    (product_id, expires_on)
+    batch_code
+  }
+}
+
+Table families {
+  id bigint [pk, increment]
+  reference_code varchar(30) [not null, unique]
+  contact_name varchar(150) [not null]
+  phone varchar(30)
+  household_size integer [not null, check: `household_size > 0`]
+  address text [not null]
+  neighborhood varchar(100) [not null]
+  city varchar(100) [not null]
+  state varchar(2) [not null]
+  postal_code varchar(8)
+  latitude decimal(9,6) [check: `latitude BETWEEN -90 AND 90`]
+  longitude decimal(9,6) [check: `longitude BETWEEN -180 AND 180`]
+  consent_granted_at timestamp
+  consent_revoked_at timestamp
+  privacy_notice_version varchar(30)
+  is_active boolean [not null, default: true]
+  created_at timestamp [not null]
+  updated_at timestamp [not null]
+
+  checks {
+    `(latitude IS NULL AND longitude IS NULL) OR (latitude IS NOT NULL AND longitude IS NOT NULL)`
+    `consent_granted_at IS NULL OR privacy_notice_version IS NOT NULL`
+    `consent_revoked_at IS NULL OR (consent_granted_at IS NOT NULL AND consent_revoked_at >= consent_granted_at)`
+  }
+}
+
+Table partner_organizations {
+  id bigint [pk, increment]
+  name varchar(200) [not null]
+  tax_id varchar(14) [unique]
+  contact_name varchar(150)
+  phone varchar(30)
+  address text [not null]
+  latitude decimal(9,6) [check: `latitude BETWEEN -90 AND 90`]
+  longitude decimal(9,6) [check: `longitude BETWEEN -180 AND 180`]
+  is_active boolean [not null, default: true]
+  created_at timestamp [not null]
+  updated_at timestamp [not null]
+
+  checks {
+    `(latitude IS NULL AND longitude IS NULL) OR (latitude IS NOT NULL AND longitude IS NOT NULL)`
+  }
+}
+
+Table delivery_routes {
+  id bigint [pk, increment]
+  reference_code varchar(30) [not null, unique]
+  origin_warehouse_id bigint [not null, ref: > warehouses.id]
+  scheduled_on date [not null]
+  status route_status [not null, default: 'waiting']
+  assigned_to bigint [ref: > users.id]
+  started_at timestamp
+  completed_at timestamp
+  created_by bigint [not null, ref: > users.id]
+  created_at timestamp [not null]
+  updated_at timestamp [not null]
+
+  checks {
+    `status <> 'completed' OR (started_at IS NOT NULL AND completed_at IS NOT NULL)`
+    `completed_at IS NULL OR (started_at IS NOT NULL AND completed_at >= started_at)`
+  }
+
+  indexes {
+    (scheduled_on, status)
+  }
+}
+
+Table deliveries {
+  id bigint [pk, increment]
+  family_id bigint [ref: > families.id]
+  partner_organization_id bigint [ref: > partner_organizations.id]
+  route_id bigint [ref: > delivery_routes.id]
+  stop_sequence integer [check: `stop_sequence > 0`]
+  status delivery_status [not null, default: 'waiting']
+  destination_address text [not null]
+  destination_latitude decimal(9,6) [check: `destination_latitude BETWEEN -90 AND 90`]
+  destination_longitude decimal(9,6) [check: `destination_longitude BETWEEN -180 AND 180`]
+  scheduled_at timestamp
+  dispatched_at timestamp
+  delivered_at timestamp
+  description varchar(255)
+  notes text
+  created_by bigint [not null, ref: > users.id]
+  created_at timestamp [not null]
+  updated_at timestamp [not null]
+
+  checks {
+    `(family_id IS NOT NULL AND partner_organization_id IS NULL) OR (family_id IS NULL AND partner_organization_id IS NOT NULL)`
+    `(route_id IS NULL AND stop_sequence IS NULL) OR (route_id IS NOT NULL AND stop_sequence IS NOT NULL)`
+    `(destination_latitude IS NULL AND destination_longitude IS NULL) OR (destination_latitude IS NOT NULL AND destination_longitude IS NOT NULL)`
+    `status <> 'delivered' OR delivered_at IS NOT NULL`
+    `delivered_at IS NULL OR delivered_at >= created_at`
+    `dispatched_at IS NULL OR dispatched_at >= created_at`
+    `delivered_at IS NULL OR dispatched_at IS NULL OR delivered_at >= dispatched_at`
+  }
+
+  indexes {
+    (route_id, stop_sequence) [unique]
+    (family_id, delivered_at)
+    (partner_organization_id, delivered_at)
+    (status, scheduled_at)
+  }
+}
+
+Table delivery_items {
+  id bigint [pk, increment]
+  delivery_id bigint [not null, ref: > deliveries.id]
+  batch_id bigint [not null, ref: > inventory_batches.id]
+  quantity decimal(12,3) [not null, check: `quantity > 0`]
+
+  indexes {
+    (delivery_id, batch_id) [unique]
+    (id, batch_id) [unique]
+  }
+}
+
+Table stock_movements {
+  id bigint [pk, increment]
+  batch_id bigint [not null, ref: > inventory_batches.id]
+  type stock_movement_type [not null]
+  quantity decimal(12,3) [not null, check: `quantity > 0`]
+  from_warehouse_id bigint [ref: > warehouses.id]
+  to_warehouse_id bigint [ref: > warehouses.id]
+  delivery_item_id bigint
+  reason text
+  moved_at timestamp [not null]
+  recorded_by bigint [not null, ref: > users.id]
+  created_at timestamp [not null]
+
+  checks {
+    `(type IN ('receipt', 'return', 'adjustment_in') AND from_warehouse_id IS NULL AND to_warehouse_id IS NOT NULL) OR (type IN ('distribution', 'expiration_loss', 'other_loss', 'adjustment_out') AND from_warehouse_id IS NOT NULL AND to_warehouse_id IS NULL) OR (type = 'transfer' AND from_warehouse_id IS NOT NULL AND to_warehouse_id IS NOT NULL AND from_warehouse_id <> to_warehouse_id)`
+    `(type IN ('distribution', 'return') AND delivery_item_id IS NOT NULL) OR (type NOT IN ('distribution', 'return') AND delivery_item_id IS NULL)`
+    `type NOT IN ('expiration_loss', 'other_loss', 'adjustment_in', 'adjustment_out', 'return') OR reason IS NOT NULL`
+  }
+
+  indexes {
+    (batch_id, from_warehouse_id, moved_at)
+    (batch_id, to_warehouse_id, moved_at)
+    (type, moved_at)
+    (delivery_item_id, batch_id)
+  }
+}
+
+Ref: stock_movements.(delivery_item_id, batch_id) > delivery_items.(id, batch_id) [delete: restrict]
+
+Table audit_logs {
+  id bigint [pk, increment]
+  actor_id bigint [ref: > users.id]
+  action varchar(100) [not null]
+  entity_table varchar(100)
+  entity_id bigint
+  before_values text
+  after_values text
+  ip_address varchar(45)
+  occurred_at timestamp [not null]
+
+  indexes {
+    (entity_table, entity_id, occurred_at)
+    (actor_id, occurred_at)
+  }
+}

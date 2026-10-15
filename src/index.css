@@ -1,0 +1,47 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Nunito", ui-sans-serif, system-ui, sans-serif;
+
+  /* verdes: folha */
+  --color-leaf-100: #dcefd8;
+  --color-leaf-600: #2e7d32;
+  --color-leaf-700: #256a29;
+  --color-leaf-800: #1b5e20;
+  --color-leaf-900: #14532d;
+
+  /* laranja: cenoura */
+  --color-carrot-100: #ffd9a8;
+  --color-carrot-500: #f28c28;
+  --color-carrot-800: #6b3a00;
+
+  /* vermelho: tomate */
+  --color-tomato-100: #fbe0dc;
+  --color-tomato-600: #c8372d;
+
+  /* neutros: pão e trigo */
+  --color-cream-50: #fff8ec;
+  --color-cream-100: #fbf3e2;
+  --color-cream-200: #eadbc0;
+  --color-cream-300: #c9b48f;
+  --color-cream-500: #8c7b63;
+  --color-ink-600: #6b5a44;
+  --color-ink-900: #2b2118;
+}
+
+@layer base {
+  body {
+    @apply bg-cream-50 font-sans text-ink-900 antialiased;
+  }
+  :focus-visible {
+    outline: 2px solid var(--color-leaf-600);
+    outline-offset: 2px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, ::before, ::after {
+    transition: none !important;
+    animation: none !important;
+  }
+}

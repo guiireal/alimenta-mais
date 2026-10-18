@@ -1,5 +1,4 @@
 -- +goose Up
--- Existing opaque access tokens are invalidated when switching to JWT sessions.
 DELETE FROM sessions;
 ALTER TABLE sessions RENAME COLUMN token_hash TO id;
 ALTER TABLE sessions ADD COLUMN csrf_hash char(64) NOT NULL;

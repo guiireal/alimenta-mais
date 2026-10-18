@@ -17,7 +17,6 @@ func scanJSON[T any](row scanner) (T, error) {
 	return out, err
 }
 
-// The original schema stores UTC instants without timezone; JSON must include one.
 func entityJSON(alias string, timestamps ...string) string {
 	fields := []string{}
 	for _, field := range append([]string{"created_at", "updated_at"}, timestamps...) {

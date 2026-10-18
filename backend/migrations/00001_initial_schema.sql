@@ -1,5 +1,4 @@
 -- +goose Up
--- Schema inicial de docs/database.dbml.
 
 CREATE TYPE "user_role" AS ENUM (
   'administrator',

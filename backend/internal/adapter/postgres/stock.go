@@ -52,7 +52,6 @@ func (s *Store) CreateMovement(ctx context.Context, m *domain.StockMovement) err
 	return translate(s.query.QueryRowContext(ctx, `INSERT INTO stock_movements(batch_id,type,quantity,from_warehouse_id,to_warehouse_id,delivery_item_id,reason,moved_at,recorded_by,created_at) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) RETURNING id`, m.BatchID, m.Type, m.Quantity, m.FromWarehouseID, m.ToWarehouseID, m.DeliveryItemID, m.Reason, m.MovedAt, m.RecordedBy, m.CreatedAt).Scan(&m.ID))
 }
 func (s *Store) AvailableBatches(ctx context.Context, productID, warehouseID int64, today domain.Date) ([]domain.AvailableBatch, error) {
-	// The use case holds the product row lock before reading these balances.
 	rows, err := s.query.QueryContext(ctx, `SELECT b.id,bal.quantity::numeric(12,3) FROM inventory_batches b JOIN stock_balances bal ON bal.batch_id=b.id WHERE b.product_id=$1 AND bal.warehouse_id=$2 AND bal.quantity>0 AND b.triage_status='approved' AND b.expires_on >= $3::date ORDER BY b.expires_on,b.id`, productID, warehouseID, today)
 	if err != nil {
 		return nil, translate(err)

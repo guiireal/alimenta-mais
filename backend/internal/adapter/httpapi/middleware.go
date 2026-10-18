@@ -76,8 +76,6 @@ type limiter struct {
 	clients map[string]loginWindow
 }
 
-// shortcut: limits are per process; use a shared gateway when deploying multiple instances.
-
 func newLimiter() *limiter { return &limiter{clients: make(map[string]loginWindow)} }
 func (l *limiter) limit(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

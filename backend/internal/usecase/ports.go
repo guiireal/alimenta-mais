@@ -7,7 +7,6 @@ import (
 	"alimenta-mais/backend/internal/domain"
 )
 
-// Repositories are provided again inside each transaction; no SQL leaks into use cases.
 type Repositories struct {
 	Users      UserRepository
 	Sessions   SessionRepository

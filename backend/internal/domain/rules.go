@@ -19,7 +19,6 @@ type ValidationError map[string]string
 
 func (v ValidationError) Error() string { return "dados inválidos" }
 
-// Decimal keeps database precision without coupling the domain to a SQL driver.
 type Decimal string
 
 func (d Decimal) Scaled(scale int) (int64, error) {

@@ -2,7 +2,6 @@ package domain
 
 import "time"
 
-// Projections combine data needed by the UI without changing the write entities.
 type InventoryLot struct {
 	InventoryBatch
 	ProductName  string             `json:"product_name"`

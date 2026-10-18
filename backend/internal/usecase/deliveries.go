@@ -277,7 +277,6 @@ func (s *Deliveries) Dispatch(ctx context.Context, a domain.Actor, id int64) (do
 		for productID, qty := range totals {
 			requests = append(requests, RequestedItem{ProductID: productID, Quantity: domain.Quantity(qty)})
 		}
-		// Reallocate at dispatch: a waiting delivery does not reserve stock.
 		items, err := allocate(ctx, r, *d.SourceWarehouseID, requests)
 		if err != nil {
 			return err

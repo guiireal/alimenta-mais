@@ -180,7 +180,6 @@ func (s *Auth) Refresh(ctx context.Context, token, csrf, ip string) (LoginResult
 			return domain.ErrForbidden
 		}
 		if stored.UsedAt != nil {
-			// Commit the revocation before reporting reuse to the client.
 			reused = true
 			if err := r.Sessions.DeleteSession(ctx, stored.SessionID); err != nil {
 				return err

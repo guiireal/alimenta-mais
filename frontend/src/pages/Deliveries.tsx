@@ -1,117 +1,50 @@
-import { Plus } from 'lucide-react'
+import { useState } from 'react'
+import { useQuery } from '@tanstack/react-query'
 import { useSearchParams } from 'react-router-dom'
-import { AsyncBoundary, Badge, Button, Card, EmptyState, LinkButton, PageHeader, Skeleton, TableScroll, tdClass, thClass } from '../components/ui'
+import { AsyncBoundary, Badge, Button, Card, EmptyState, LinkButton, PageHeader, TableScroll, tdClass, thClass } from '../components/ui'
 import { useAuth } from '../context/AuthContext'
 import { useToast } from '../context/ToastContext'
-import { useAdvanceStop, useRoutes } from '../hooks/queries'
-import { cn, DELIVERY_META, errorMessage } from '../lib/utils'
-import type { DeliveryStatus } from '../types'
-
-const ACTION_LABEL: Record<DeliveryStatus, string | null> = { waiting: 'Iniciar entrega', en_route: 'Confirmar entrega', delivered: null }
-
+import { useAdvanceStop, useRoutes, useSetRouteStatus } from '../hooks/queries'
+import { cn, DELIVERY_META, errorMessage, formatDate } from '../lib/utils'
+import { http } from '../services/http'
+import type { RouteStatus } from '../types'
+const ROUTE_LABEL: Record<RouteStatus, string> = { waiting: 'Aguardando', in_transit: 'Em andamento', completed: 'Concluída', cancelled: 'Cancelada' }
+function Items({ id }: { id: string }) {
+  const query = useQuery({ queryKey: ['delivery', id], queryFn: () => http.get<{ items: { id: number; batch_id: number; quantity: string }[] }>('/deliveries/' + id) })
+  return <Card title={'Itens da entrega #' + id}><AsyncBoundary isPending={query.isPending} isError={query.isError} error={query.error} onRetry={() => void query.refetch()}><ul>{query.data?.items.map((i) => <li key={i.id}>Lote #{i.batch_id} · Quantidade: {i.quantity}</li>)}</ul></AsyncBoundary></Card>
+}
 export default function Deliveries() {
   const { can } = useAuth()
   const toast = useToast()
   const [params, setParams] = useSearchParams()
+  const [deliveryId, setDeliveryId] = useState('')
   const routes = useRoutes()
   const advance = useAdvanceStop()
-
+  const change = useSetRouteStatus()
   const list = routes.data ?? []
   const route = list.find((r) => r.id === params.get('rota')) ?? list[0]
-
-  const onAdvance = (routeId: string, stopId: string, status: DeliveryStatus) =>
-    advance.mutate({ routeId, stopId }, {
-      onSuccess: () => toast.success(status === 'en_route' ? 'Entrega confirmada.' : 'Entrega iniciada.'),
-      onError: (e) => toast.error(errorMessage(e)),
-    })
-
-  return (
-    <>
-      <PageHeader
-        title="Entregas e rotas"
-        description="Acompanhe as paradas do dia e gere novas rotas para as famílias com consentimento."
-        actions={can('delivery:write') && <LinkButton to="/entregas/nova"><Plus size={16} aria-hidden="true" />Nova rota</LinkButton>}
-      />
-
-      <AsyncBoundary isPending={routes.isPending} isError={routes.isError} error={routes.error} onRetry={() => void routes.refetch()} skeleton={<Skeleton className="h-96" />}>
-        {!route ? (
-          <EmptyState title="Nenhuma rota criada" description="Crie uma rota para organizar as entregas do dia." />
-        ) : (
-          <>
-            <div className="flex flex-wrap gap-2" role="group" aria-label="Escolher rota">
-              {list.map((r) => (
-                <button
-                  key={r.id}
-                  type="button"
-                  aria-pressed={r.id === route.id}
-                  onClick={() => setParams({ rota: r.id }, { replace: true })}
-                  className={cn('h-10 rounded-lg px-4 text-sm font-bold transition-colors', r.id === route.id ? 'bg-leaf-900 text-white' : 'border border-cream-500 bg-white hover:bg-cream-100')}
-                >
-                  {r.name}
-                </button>
-              ))}
-            </div>
-
-            <div className="grid gap-4 lg:grid-cols-5">
-              <Card title="Mapa da rota" className="lg:col-span-3">
-                <div className="relative aspect-[16/11] overflow-hidden rounded-lg border border-dashed border-cream-300 bg-cream-100">
-                  <svg viewBox="0 0 100 100" preserveAspectRatio="none" className="absolute inset-0 size-full" aria-hidden="true">
-                    <polyline points={[route.depot, ...route.stops].map((p) => `${p.x},${p.y}`).join(' ')} fill="none" stroke="#f28c28" strokeWidth="2.5" strokeDasharray="5 4" vectorEffect="non-scaling-stroke" />
-                  </svg>
-                  <span className="absolute grid size-8 -translate-x-1/2 -translate-y-1/2 place-items-center rounded-full bg-leaf-900 text-xs font-extrabold text-white" style={{ left: `${route.depot.x}%`, top: `${route.depot.y}%` }} title="Depósito">D</span>
-                  {route.stops.map((s) => (
-                    <span key={s.id} title={`${s.order}. ${s.destination}`} className={cn('absolute grid size-8 -translate-x-1/2 -translate-y-1/2 place-items-center rounded-full text-xs font-extrabold', DELIVERY_META[s.status].pin)} style={{ left: `${s.x}%`, top: `${s.y}%` }}>{s.order}</span>
-                  ))}
-                </div>
-                <p className="mt-3 text-sm text-ink-600">Mapa ilustrativo. Na versão integrada, a rota virá de um serviço de mapas.</p>
-              </Card>
-
-              <Card title="Detalhes da rota" className="lg:col-span-2">
-                <dl className="grid grid-cols-2 gap-3 text-sm">
-                  <div><dt className="text-ink-600">Equipe</dt><dd className="font-bold">{route.driver}</dd></div>
-                  <div><dt className="text-ink-600">Veículo</dt><dd className="font-bold">{route.vehicle}</dd></div>
-                  <div><dt className="text-ink-600">Paradas</dt><dd className="font-bold">{route.stops.length}</dd></div>
-                  <div><dt className="text-ink-600">Entregues</dt><dd className="font-bold">{route.stops.filter((s) => s.status === 'delivered').length}</dd></div>
-                </dl>
-              </Card>
-            </div>
-
-            <Card title="Paradas">
-              <TableScroll minWidth="min-w-[640px]">
-                <thead>
-                  <tr>
-                    <th className={thClass}>Ordem</th><th className={thClass}>Destino</th><th className={thClass}>Itens</th><th className={thClass}>Previsão</th><th className={thClass}>Situação</th>
-                    {can('delivery:write') && <th className={thClass}><span className="sr-only">Ação</span></th>}
-                  </tr>
-                </thead>
-                <tbody>
-                  {route.stops.map((s) => {
-                    const label = ACTION_LABEL[s.status]
-                    return (
-                      <tr key={s.id}>
-                        <td className={`${tdClass} font-semibold`}>{s.order}</td>
-                        <td className={tdClass}>{s.destination}</td>
-                        <td className={tdClass}>{s.items}</td>
-                        <td className={tdClass}>{s.eta}</td>
-                        <td className={tdClass}><Badge tone={DELIVERY_META[s.status].tone}>{DELIVERY_META[s.status].label}</Badge></td>
-                        {can('delivery:write') && (
-                          <td className={tdClass}>
-                            {label && (
-                              <Button variant="secondary" className="h-8 px-3 text-xs" disabled={advance.isPending && advance.variables?.stopId === s.id} onClick={() => onAdvance(route.id, s.id, s.status)}>
-                                {label}
-                              </Button>
-                            )}
-                          </td>
-                        )}
-                      </tr>
-                    )
-                  })}
-                </tbody>
-              </TableScroll>
-            </Card>
-          </>
-        )}
-      </AsyncBoundary>
-    </>
-  )
+  const onError = (e: unknown) => toast.error(errorMessage(e))
+  const setStatus = (status: RouteStatus) => { if (route) change.mutate({ id: route.id, status }, { onSuccess: () => toast.success('Rota atualizada.'), onError }) }
+  return <>
+    <PageHeader title="Entregas e rotas" description="Organize as entregas, confira os produtos e acompanhe a execução." actions={can('delivery:write') && <LinkButton to="/entregas/nova">Nova rota</LinkButton>} />
+    <AsyncBoundary isPending={routes.isPending} isError={routes.isError} error={routes.error} onRetry={() => void routes.refetch()}>
+      {!route ? <EmptyState title="Nenhuma rota criada" description="Crie uma rota para organizar as entregas." /> : <>
+        <div className="flex flex-wrap gap-2" role="group" aria-label="Escolher rota">{list.map((r) => <button key={r.id} type="button" aria-pressed={r.id === route.id} onClick={() => { setParams({ rota: r.id }, { replace: true }); setDeliveryId('') }} className={cn('rounded-lg px-4 py-2 text-sm font-bold', r.id === route.id ? 'bg-leaf-900 text-white' : 'border border-cream-500 bg-white')}>{r.name}</button>)}</div>
+        <Card title={route.name}><dl className="grid gap-3 text-sm sm:grid-cols-4">
+          <div><dt>Responsável</dt><dd className="font-bold">{route.driver}</dd></div><div><dt>Origem</dt><dd className="font-bold">{route.warehouse}</dd></div>
+          <div><dt>Data</dt><dd className="font-bold">{formatDate(route.scheduledOn)}</dd></div><div><dt>Situação</dt><dd><Badge>{ROUTE_LABEL[route.status]}</Badge></dd></div>
+        </dl>{can('delivery:write') && <div className="mt-4 flex flex-wrap gap-2">
+          {route.status === 'waiting' && <><LinkButton to={'/entregas/' + route.id + '/nova'} variant="secondary">Adicionar entrega</LinkButton><Button disabled={change.isPending} onClick={() => setStatus('in_transit')}>Iniciar rota</Button><Button variant="secondary" disabled={change.isPending} onClick={() => setStatus('cancelled')}>Cancelar rota</Button></>}
+          {route.status === 'in_transit' && <Button disabled={change.isPending} onClick={() => setStatus('completed')}>Concluir rota</Button>}
+        </div>}</Card>
+        <Card title="Paradas"><TableScroll><thead><tr><th className={thClass}>Ordem</th><th className={thClass}>Destino</th><th className={thClass}>Situação</th><th className={thClass}>Ações</th></tr></thead>
+          <tbody>{route.stops.map((s) => <tr key={s.id}><td className={tdClass}>{s.order}</td><td className={tdClass}>{s.destination}</td><td className={tdClass}><Badge tone={DELIVERY_META[s.status].tone}>{DELIVERY_META[s.status].label}</Badge></td>
+            <td className={tdClass}><div className="flex flex-wrap gap-2"><Button variant="ghost" onClick={() => setDeliveryId(s.id)}>Ver itens</Button>
+              {can('delivery:write') && route.status === 'in_transit' && (s.status === 'waiting' || s.status === 'en_route') && <Button variant="secondary" disabled={advance.isPending} onClick={() => advance.mutate({ routeId: route.id, stopId: s.id, status: s.status as 'waiting' | 'en_route' }, { onSuccess: () => toast.success('Entrega atualizada.'), onError })}>{s.status === 'waiting' ? 'Iniciar entrega' : 'Confirmar entrega'}</Button>}
+            </div></td></tr>)}</tbody>
+        </TableScroll>{route.stops.length === 0 && <p className="py-4 text-sm">Nenhuma entrega adicionada.</p>}</Card>
+        {deliveryId && <Items key={deliveryId} id={deliveryId} />}
+      </>}
+    </AsyncBoundary>
+  </>
 }

@@ -1,51 +1,28 @@
 import { describe, expect, it } from 'vitest'
-import { donationHasErrors, validateDonation, validateDonor, validateFamily, validateLogin, validateLot, validateRegister, validateRoute } from './validators'
+import { decimalProblem, donationHasErrors, validateDonation, validateFamily, validateLogin, validateLot, validateRegister, validateRoute } from './validators'
 import { todayInput } from './utils'
-
-const lot = { item: 'Leite integral', category: 'Laticínios', quantity: '10', unit: 'un', expiresAt: '', warehouse: 'Câmara fria' }
-
-describe('validateLot', () => {
-  it('aceita um lote válido', () => expect(Object.values(validateLot(lot)).some(Boolean)).toBe(false))
-  it('exige câmara fria para perecíveis', () => expect(validateLot({ ...lot, warehouse: 'Seco A' }).warehouse).toMatch(/câmara fria/))
-  it('recusa item vencido e quantidade quebrada em unidades', () => {
+const lot = { productId: '1', batchCode: 'ABC', quantity: '10', unitWeightKg: '0.123456', expiresAt: new Date().toISOString().slice(0, 10), warehouse: '2' }
+describe('formulários reais', () => {
+  it('exige código, produto, validade e depósito para entrada aprovada', () => {
+    expect(Object.values(validateLot(lot)).some(Boolean)).toBe(false)
+    expect(validateLot({ ...lot, productId: '', expiresAt: '', warehouse: '' })).toMatchObject({ productId: expect.any(String), expiresAt: expect.any(String), warehouse: expect.any(String) })
     expect(validateLot({ ...lot, expiresAt: '2000-01-01' }).expiresAt).toBeDefined()
-    expect(validateLot({ ...lot, quantity: '2,5' }).quantity).toBeDefined()
   })
-})
-
-describe('outros formulários', () => {
-  it('login', () => expect(validateLogin({ email: 'x', password: '' })).toEqual({ email: 'Informe um e-mail válido', password: 'Campo obrigatório' }))
-  it('doador: e-mail e telefone opcionais, mas validados quando preenchidos', () => {
-    expect(validateDonor({ name: 'Padaria', type: 'PJ', email: '', phone: '' }).email).toBeUndefined()
-    expect(validateDonor({ name: 'Padaria', type: 'PJ', email: 'a@b', phone: '123' })).toMatchObject({ email: expect.any(String), phone: expect.any(String) })
+  it('valida a precisão sem arredondar entradas', () => { expect(decimalProblem('0,001')).toBeUndefined(); expect(decimalProblem('0.0001')).toBeDefined(); expect(decimalProblem('0')).toBeDefined(); expect(decimalProblem('1e3')).toBeDefined() })
+  it('triagem pendente não exige depósito nem validade', () => {
+    expect(donationHasErrors(validateDonation({ donorId: '1', receivedAt: todayInput(), items: [{ ...lot, key: 'a', expiresAt: '', warehouse: '', triage: 'review' }] }))).toBe(false)
+    expect(donationHasErrors(validateDonation({ donorId: '1', receivedAt: todayInput(), items: [{ ...lot, key: 'a', expiresAt: '', triage: 'approved' }] }))).toBe(true)
   })
-  it('família', () => expect(validateFamily({ neighborhood: 'Centro', members: '25', consent: false }).members).toBeDefined())
-  it('rota exige ao menos uma família', () =>
-    expect(validateRoute({ name: 'R', vehicle: 'Van', driver: 'A', startTime: '09:00', familyIds: [] }).familyIds).toBeDefined())
-})
-
-describe('validateDonation', () => {
-  const item = { key: 'a', name: 'Leite', category: 'Laticínios', quantity: '5', expiresAt: '', triage: 'approved' as const }
-  it('item aprovado precisa de validade', () => {
-    const e = validateDonation({ donorId: 'DN-01', receivedAt: todayInput(), items: [item] })
-    expect(e.byItem.a.expiresAt).toBeDefined()
-    expect(donationHasErrors(e)).toBe(true)
+  it('família exige endereço e UF; rota exige origem e data', () => {
+    expect(validateFamily({ code: 'F1', contactName: 'Maria', address: '', neighborhood: 'Centro', city: 'São Paulo', state: 'sp', members: '0' })).toMatchObject({ address: expect.any(String), state: expect.any(String), members: expect.any(String) })
+    expect(validateRoute({ name: 'R1', warehouseId: '', scheduledOn: '', assignedTo: '' })).toMatchObject({ warehouseId: expect.any(String), scheduledOn: expect.any(String) })
   })
-  it('item recusado não precisa de validade', () => {
-    const e = validateDonation({ donorId: 'DN-01', receivedAt: todayInput(), items: [{ ...item, triage: 'rejected' }] })
-    expect(donationHasErrors(e)).toBe(false)
-  })
-})
-
-describe('validateRegister', () => {
-  const ok = { name: 'Maria Teste', email: 'maria@teste.com', password: 'senha1234', confirm: 'senha1234', accept: true }
-  it('aceita um cadastro válido', () => expect(Object.values(validateRegister(ok)).some(Boolean)).toBe(false))
-  it('exige letras e números, mínimo de 8 caracteres', () => {
-    expect(validateRegister({ ...ok, password: 'curta1', confirm: 'curta1' }).password).toBeDefined()
-    expect(validateRegister({ ...ok, password: 'somenteletras', confirm: 'somenteletras' }).password).toBeDefined()
-  })
-  it('confere as senhas e o aceite da LGPD', () => {
-    expect(validateRegister({ ...ok, confirm: 'outra1234' }).confirm).toBeDefined()
+  it('login e cadastro validam credenciais e limite de bcrypt em bytes', () => {
+    expect(validateLogin({ email: 'bad', password: '' }).email).toBeDefined()
+    const ok = { name: 'Maria', email: 'maria@example.test', password: 'Secret1234', confirm: 'Secret1234', accept: true }
+    expect(Object.values(validateRegister(ok)).some(Boolean)).toBe(false)
+    expect(validateRegister({ ...ok, password: 'á'.repeat(36) + 'a1' }).password).toBeDefined()
+    expect(validateRegister({ ...ok, confirm: 'other' }).confirm).toBeDefined()
     expect(validateRegister({ ...ok, accept: false }).accept).toBeDefined()
   })
 })

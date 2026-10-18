@@ -1,40 +1,25 @@
-import { describe, expect, it } from 'vitest'
-import { createDonation } from './donations'
-import { createLot, disposeLot, getLot, getStockStats, listLots, transferLot } from './stock'
-
-const failsWith = async (promise: Promise<unknown>, status: number) =>
-  promise.then(() => false, (e: { status?: number }) => e.status === status)
-
-describe('estoque (mock)', () => {
-  it('lista pelo FEFO, filtra e pagina', async () => {
-    const first = await listLots({ pageSize: 4 })
-    expect(first.items[0].id).toBe('L-0003') // o vencido sai primeiro
-    expect((await listLots({ status: 'alert' })).total).toBe(3)
-    expect((await listLots({ q: 'leite' })).total).toBe(1)
-    expect((await listLots({ page: 99, pageSize: 4 })).page).toBe(3)
+import { afterEach, expect, it, vi } from 'vitest'
+import { createLot, exportLots } from './stock'
+afterEach(() => vi.unstubAllGlobals())
+it('sends exact decimal strings and real product/warehouse IDs', async () => {
+  vi.stubGlobal('window', { location: { origin: 'http://localhost:5173' } })
+  vi.stubGlobal('document', { cookie: 'alimenta_csrf=test' })
+  const fetcher = vi.fn().mockResolvedValue(new Response('{"id":42}', { status: 201 }))
+  vi.stubGlobal('fetch', fetcher)
+  expect(await createLot({ productId: '3', batchCode: 'LOTE-1', warehouse: '7', quantity: '0,001', unitWeightKg: '0,123456', expiresAt: '2030-10-10' })).toEqual({ id: '42' })
+  expect(JSON.parse(fetcher.mock.calls[0][1].body)).toEqual({ product_id: 3, batch_code: 'LOTE-1', warehouse_id: 7, quantity: '0.001', unit_weight_kg: '0.123456', expires_on: '2030-10-10', triage_status: 'approved' })
+})
+it('exports every server page respecting the maximum page size and filters', async () => {
+  vi.stubGlobal('window', { location: { origin: 'http://localhost:5173' } })
+  const lot = { id: 1, product_id: 1, batch_code: 'A', product_name: 'Arroz', category_name: 'Grãos', unit: 'kg', quantity: '1.001', expires_on: '2030-10-10', balances: [] }
+  const fetcher = vi.fn().mockImplementation(async (url: URL) => {
+    expect(url.searchParams.get('page_size')).toBe('100')
+    expect(url.searchParams.get('category_id')).toBe('2')
+    const page = Number(url.searchParams.get('page'))
+    return new Response(JSON.stringify({ items: page === 1 ? Array(100).fill(lot) : [{ ...lot, id: 101 }], total: 101, page, page_size: 100 }))
   })
-
-  it('aplica a regra de perecíveis e o ciclo remanejar e dar baixa', async () => {
-    expect(await failsWith(createLot({ item: 'Leite', category: 'Laticínios', quantity: 5, unit: 'un', expiresAt: null, warehouse: 'Seco A' }), 422)).toBe(true)
-    const lot = await createLot({ item: 'Arroz', category: 'Grãos', quantity: 5, unit: 'un', expiresAt: null, warehouse: 'Seco B' })
-    await transferLot(lot.id, 'Seco A')
-    expect(await failsWith(transferLot(lot.id, 'Seco A'), 409)).toBe(true)
-    await disposeLot(lot.id, 'Avaria')
-    expect(await failsWith(disposeLot(lot.id, 'Avaria'), 409)).toBe(true)
-    expect((await getLot(lot.id)).movements).toHaveLength(3)
-  })
-
-  it('doação aprovada vira lote; item recusado não', async () => {
-    const before = (await getStockStats()).registeredPct
-    const { lotIds, donation } = await createDonation({
-      donorId: 'DN-01', receivedAt: '2026-10-14', document: 'N-1',
-      items: [
-        { name: 'Leite', category: 'Laticínios', quantity: 10, expiresAt: '2030-01-01', triage: 'approved' },
-        { name: 'Iogurte', category: 'Laticínios', quantity: 3, expiresAt: null, triage: 'rejected' },
-      ],
-    })
-    expect(lotIds).toHaveLength(1)
-    expect(donation.stage).toBe('triage')
-    expect(typeof before).toBe('number')
-  })
+  vi.stubGlobal('fetch', fetcher)
+  const result = await exportLots({ category: '2', status: 'critical' })
+  expect(result.items).toHaveLength(101)
+  expect(fetcher).toHaveBeenCalledTimes(2)
 })

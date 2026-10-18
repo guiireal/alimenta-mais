@@ -37,7 +37,7 @@ export default function Reports() {
             <StatStrip stats={[
               { label: `Doado em ${months} meses`, value: `${formatNumber(data.donatedKg)} kg` },
               { label: `Distribuído em ${months} meses`, value: `${formatNumber(data.distributedKg)} kg` },
-              { label: 'Perda por vencimento', value: `${((data.lossKg / data.donatedKg) * 100).toFixed(1).replace('.', ',')}%`, hint: 'Sobre o total doado no período' },
+              { label: 'Perdas no período', value: data.donatedKg > 0 ? `${((data.lossKg / data.donatedKg) * 100).toFixed(1).replace('.', ',')}%` : 'Sem base de comparação', hint: 'Vencimento e outras perdas sobre o total doado' },
               { label: 'Cobertura de famílias', value: `${data.coveragePct}%` },
             ]} />
             <div className="grid gap-4 lg:grid-cols-3">

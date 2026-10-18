@@ -2,128 +2,66 @@ import { useState } from 'react'
 import { useParams } from 'react-router-dom'
 import { ExpiryBadge } from '../components/ExpiryBadge'
 import { ConfirmDialog } from '../components/ConfirmDialog'
-import { ShelfLife } from '../components/ShelfLife'
-import { AsyncBoundary, Badge, BackLink, Button, Card, controlClass, Field, FormError, PageHeader, Skeleton } from '../components/ui'
+import { AsyncBoundary, BackLink, Button, Card, controlClass, Field, FormError, PageHeader } from '../components/ui'
 import { useAuth } from '../context/AuthContext'
 import { useToast } from '../context/ToastContext'
-import { useDisposeLot, useLot, useTransferLot } from '../hooks/queries'
-import { daysLabel, formatDate, formatDateTime } from '../lib/utils'
-import { validateDisposal } from '../lib/validators'
-import type { DisposalReason, MovementType, Warehouse } from '../types'
+import { useCatalog, useDisposeLot, useLot, useTransferLot } from '../hooks/queries'
+import { formatDate, formatDateTime } from '../lib/utils'
+import { decimalProblem } from '../lib/validators'
+import type { DisposalReason, MovementType } from '../types'
 
-const WAREHOUSES: Warehouse[] = ['Câmara fria', 'Seco A', 'Seco B']
 const REASONS: DisposalReason[] = ['Vencimento', 'Avaria', 'Contaminação', 'Outro']
-const MOVEMENT_LABEL: Record<MovementType, string> = { entry: 'Entrada', transfer: 'Remanejamento', disposal: 'Baixa' }
-
+const LABELS: Record<MovementType, string> = { entry: 'Entrada', transfer: 'Remanejamento', expiration_loss: 'Perda por vencimento', other_loss: 'Outra perda', distribution: 'Distribuição', return: 'Devolução', adjustment_out: 'Ajuste de saída' }
 export default function LotDetail() {
   const { id = '' } = useParams()
   const { can } = useAuth()
   const toast = useToast()
-  const lotQuery = useLot(id)
+  const query = useLot(id)
+  const catalog = useCatalog()
   const transfer = useTransferLot()
   const dispose = useDisposeLot()
   const [dialog, setDialog] = useState<'transfer' | 'dispose' | null>(null)
-  const [warehouse, setWarehouse] = useState<Warehouse | ''>('')
-  const [reason, setReason] = useState<DisposalReason | ''>('')
-  const [reasonError, setReasonError] = useState<string>()
-
-  const closeDialog = () => {
-    setDialog(null)
-    setWarehouse('')
-    setReason('')
-    setReasonError(undefined)
-    transfer.reset()
-    dispose.reset()
+  const [fromWarehouse, setFrom] = useState('')
+  const [warehouse, setWarehouse] = useState('')
+  const [quantity, setQuantity] = useState('')
+  const [reason, setReason] = useState<DisposalReason>('Vencimento')
+  const [error, setError] = useState<unknown>(null)
+  const lot = query.data?.lot
+  const close = () => { setDialog(null); setFrom(''); setWarehouse(''); setQuantity(''); setError(null); transfer.reset(); dispose.reset() }
+  const confirm = () => {
+    const problem = decimalProblem(quantity)
+    if (!fromWarehouse || problem || dialog === 'transfer' && (!warehouse || warehouse === fromWarehouse)) { setError(new Error(problem ?? 'Selecione os depósitos de origem e destino.')); return }
+    const success = () => { toast.success('Movimentação registrada.'); close() }
+    if (dialog === 'transfer') transfer.mutate({ id, fromWarehouse, warehouse, quantity }, { onSuccess: success })
+    else dispose.mutate({ id, fromWarehouse, quantity, reason }, { onSuccess: success })
   }
-
-  const confirmTransfer = () => {
-    if (!warehouse) return
-    transfer.mutate({ id, warehouse }, { onSuccess: () => { toast.success(`Lote remanejado para ${warehouse}.`); closeDialog() } })
-  }
-  const confirmDispose = () => {
-    const error = validateDisposal(reason)
-    setReasonError(error)
-    if (error || !reason) return
-    dispose.mutate({ id, reason }, { onSuccess: () => { toast.success('Baixa registrada.'); closeDialog() } })
-  }
-
-  const data = lotQuery.data
-  const lot = data?.lot
-  const canAct = Boolean(lot && lot.status === 'active')
-
-  return (
-    <>
-      <BackLink to="/estoque">Voltar ao estoque</BackLink>
-      <AsyncBoundary isPending={lotQuery.isPending} isError={lotQuery.isError} error={lotQuery.error} onRetry={() => void lotQuery.refetch()} skeleton={<Skeleton className="h-72" />}>
-        {data && lot && (
-          <>
-            <PageHeader
-              title={lot.item}
-              description={`Lote ${lot.id}, ${lot.category}`}
-              actions={canAct && (
-                <>
-                  {can('stock:write') && <Button variant="secondary" onClick={() => setDialog('transfer')}>Remanejar</Button>}
-                  {can('stock:dispose') && <Button variant="danger" onClick={() => setDialog('dispose')}>Dar baixa</Button>}
-                </>
-              )}
-            />
-
-            {lot.status === 'disposed' && <p role="status" className="rounded-lg bg-cream-100 px-4 py-3 text-sm font-semibold">Este lote recebeu baixa e saiu do estoque. O histórico continua disponível abaixo.</p>}
-
-            <div className="grid gap-4 lg:grid-cols-3">
-              <Card title="Dados do lote" className="lg:col-span-2">
-                <dl className="grid grid-cols-2 gap-4 text-sm sm:grid-cols-3">
-                  <div><dt className="text-ink-600">Quantidade</dt><dd className="font-bold">{lot.quantity} {lot.unit}</dd></div>
-                  <div><dt className="text-ink-600">Depósito</dt><dd className="font-bold">{lot.warehouse}</dd></div>
-                  <div><dt className="text-ink-600">Situação</dt><dd>{lot.status === 'disposed' ? <Badge>Baixado</Badge> : <ExpiryBadge expiresAt={lot.expiresAt} />}</dd></div>
-                  <div className="col-span-2 sm:col-span-3">
-                    <dt className="text-ink-600">Validade</dt>
-                    <dd className="font-bold">{lot.expiresAt ? `${formatDate(lot.expiresAt)}, ${daysLabel(lot.expiresAt)}` : 'Não informada'}</dd>
-                    <ShelfLife expiresAt={lot.expiresAt} className="mt-2 max-w-md" />
-                  </div>
-                </dl>
-              </Card>
-
-              <Card title="Histórico de movimentações">
-                <ol className="space-y-4 border-l-2 border-cream-200 pl-4">
-                  {data.movements.map((m) => (
-                    <li key={m.id} className="text-sm">
-                      <p className="font-semibold">{MOVEMENT_LABEL[m.type]}</p>
-                      <p>{m.note}</p>
-                      <p className="text-xs text-ink-600">{m.user}, {formatDateTime(m.at)}</p>
-                    </li>
-                  ))}
-                </ol>
-              </Card>
-            </div>
-
-            <ConfirmDialog open={dialog === 'transfer'} title="Remanejar lote" confirmLabel="Remanejar" pending={transfer.isPending} onConfirm={confirmTransfer} onCancel={closeDialog}>
-              <FormError error={transfer.error} />
-              <Field label="Novo depósito">
-                {(a11y) => (
-                  <select {...a11y} value={warehouse} onChange={(e) => setWarehouse(e.target.value as Warehouse | '')} className={controlClass}>
-                    <option value="">Selecionar depósito</option>
-                    {WAREHOUSES.filter((w) => w !== lot.warehouse).map((w) => <option key={w} value={w}>{w}</option>)}
-                  </select>
-                )}
-              </Field>
-            </ConfirmDialog>
-
-            <ConfirmDialog open={dialog === 'dispose'} title="Dar baixa neste lote?" confirmLabel="Dar baixa" danger pending={dispose.isPending} onConfirm={confirmDispose} onCancel={closeDialog}>
-              <p>O lote sai do estoque e a baixa fica registrada na auditoria. Essa ação não pode ser desfeita.</p>
-              <FormError error={dispose.error} />
-              <Field label="Motivo da baixa" error={reasonError}>
-                {(a11y) => (
-                  <select {...a11y} value={reason} onChange={(e) => setReason(e.target.value as DisposalReason | '')} className={controlClass}>
-                    <option value="">Selecionar motivo</option>
-                    {REASONS.map((r) => <option key={r} value={r}>{r}</option>)}
-                  </select>
-                )}
-              </Field>
-            </ConfirmDialog>
-          </>
-        )}
-      </AsyncBoundary>
-    </>
-  )
+  return <>
+    <BackLink to="/estoque">Voltar ao estoque</BackLink>
+    <AsyncBoundary isPending={query.isPending} isError={query.isError} error={query.error} onRetry={() => void query.refetch()}>
+      {lot && query.data && <>
+        <PageHeader title={lot.item} description={'Lote ' + lot.batchCode + ' · ' + lot.category} actions={lot.quantity > 0 && <>
+          {can('stock:write') && <Button variant="secondary" onClick={() => setDialog('transfer')}>Remanejar</Button>}
+          {can('stock:dispose') && <Button variant="danger" onClick={() => setDialog('dispose')}>Dar baixa</Button>}
+        </>} />
+        <div className="grid gap-4 lg:grid-cols-2">
+          <Card title="Saldo do lote"><dl className="grid grid-cols-2 gap-4 text-sm">
+            <div><dt>Quantidade disponível</dt><dd className="font-bold">{lot.quantity} {lot.unit}</dd></div>
+            <div><dt>Validade</dt><dd>{lot.expiresAt ? formatDate(lot.expiresAt) : 'Não informada'} <ExpiryBadge expiresAt={lot.expiresAt} /></dd></div>
+          </dl><ul className="mt-4 space-y-2 text-sm">{lot.balances.map((b) => <li key={b.warehouseId}>{b.warehouseName}: <strong>{b.quantity} {lot.unit}</strong></li>)}</ul>
+            {lot.quantity === 0 && <p className="mt-3 text-sm">Este lote está sem saldo. O histórico permanece disponível.</p>}
+          </Card>
+          <Card title="Histórico de movimentações"><ol className="space-y-4 border-l-2 border-cream-200 pl-4">
+            {query.data.movements.map((m) => <li key={m.id} className="text-sm"><p className="font-bold">{LABELS[m.type]}</p><p>{m.note}</p><p className="text-xs text-ink-600">{m.user} · {formatDateTime(m.at)}</p></li>)}
+          </ol></Card>
+        </div>
+        <ConfirmDialog open={dialog !== null} title={dialog === 'transfer' ? 'Remanejar quantidade' : 'Registrar perda'} confirmLabel="Confirmar movimentação" danger={dialog === 'dispose'} pending={transfer.isPending || dispose.isPending} onConfirm={confirm} onCancel={close}>
+          <FormError error={error || transfer.error || dispose.error || catalog.error} />
+          <Field label="Depósito de origem">{(a11y) => <select {...a11y} value={fromWarehouse} onChange={(e) => setFrom(e.target.value)} className={controlClass}><option value="">Selecionar origem</option>{lot.balances.map((b) => <option key={b.warehouseId} value={b.warehouseId}>{b.warehouseName} · {b.quantity} {lot.unit}</option>)}</select>}</Field>
+          <Field label="Quantidade">{(a11y) => <input {...a11y} value={quantity} onChange={(e) => setQuantity(e.target.value)} inputMode="decimal" className={controlClass} />}</Field>
+          {dialog === 'transfer' ? <Field label="Depósito de destino">{(a11y) => <select {...a11y} value={warehouse} onChange={(e) => setWarehouse(e.target.value)} className={controlClass}><option value="">Selecionar destino</option>{catalog.data?.warehouses.filter((w) => w.is_active && String(w.id) !== fromWarehouse).map((w) => <option key={w.id} value={w.id}>{w.name}</option>)}</select>}</Field>
+            : <><p className="text-sm">A perda reduz o saldo informado e fica registrada na auditoria.</p><Field label="Motivo">{(a11y) => <select {...a11y} value={reason} onChange={(e) => setReason(e.target.value as DisposalReason)} className={controlClass}>{REASONS.map((r) => <option key={r}>{r}</option>)}</select>}</Field></>}
+        </ConfirmDialog>
+      </>}
+    </AsyncBoundary>
+  </>
 }

@@ -20,7 +20,9 @@ export default function Access() {
 
   const apply = (id: string, patch: { role?: Role; active?: boolean }, message: string) => {
     if (!me) return
-    update.mutate({ id, patch, actorId: me.id }, { onSuccess: () => toast.success(message), onError: (e) => toast.error(errorMessage(e)) })
+    const current = users.data?.find((u) => u.id === id)
+    if (!current) return
+    update.mutate({ id, patch: { role: patch.role ?? current.role, active: patch.active ?? current.active } }, { onSuccess: () => toast.success(message), onError: (e) => toast.error(errorMessage(e)) })
   }
 
   return (
@@ -42,7 +44,7 @@ export default function Access() {
                       <td className={tdClass}><p className="font-semibold">{u.name}{self && ' (você)'}</p><p className="text-xs text-ink-600">{u.email}</p></td>
                       <td className={tdClass}>
                         {canEdit && !self ? (
-                          <select aria-label={`Perfil de ${u.name}`} value={u.role} onChange={(e) => apply(u.id, { role: e.target.value as Role }, `Perfil de ${u.name} alterado.`)} className={`${controlClass} h-9 w-40`}>
+                          <select aria-label={`Perfil de ${u.name}`} disabled={update.isPending} value={u.role} onChange={(e) => apply(u.id, { role: e.target.value as Role }, `Perfil de ${u.name} alterado.`)} className={`${controlClass} h-9 w-40`}>
                             {ROLES.map((r) => <option key={r} value={r}>{ROLE_LABEL[r]}</option>)}
                           </select>
                         ) : <Badge tone={u.role === 'manager' ? 'green' : 'neutral'}>{ROLE_LABEL[u.role]}</Badge>}
@@ -50,7 +52,7 @@ export default function Access() {
                       <td className={tdClass}><Badge tone={u.active ? 'green' : 'neutral'}>{u.active ? 'Ativo' : 'Inativo'}</Badge></td>
                       {canEdit && (
                         <td className={tdClass}>
-                          {!self && <Button variant="secondary" className="h-8 px-3 text-xs" onClick={() => apply(u.id, { active: !u.active }, u.active ? `${u.name} desativado.` : `${u.name} reativado.`)}>{u.active ? 'Desativar' : 'Reativar'}</Button>}
+                          {!self && <Button variant="secondary" className="h-8 px-3 text-xs" disabled={update.isPending} onClick={() => apply(u.id, { active: !u.active }, u.active ? `${u.name} desativado.` : `${u.name} reativado.`)}>{u.active ? 'Desativar' : 'Reativar'}</Button>}
                         </td>
                       )}
                     </tr>

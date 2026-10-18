@@ -3,9 +3,9 @@ import { Bell } from 'lucide-react'
 import { Link, useLocation } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { useFamilies, useLots, useStockStats } from '../hooks/queries'
-import { daysLabel } from '../lib/utils'
+import { daysLabel, errorMessage } from '../lib/utils'
 import { ExpiryBadge } from './ExpiryBadge'
-import { Skeleton } from './ui'
+import { ErrorState, Skeleton } from './ui'
 
 /** Painel de notificações: mostra os alertas ali mesmo, sem tirar a pessoa da tela em que está. */
 export function NotificationsMenu() {
@@ -70,7 +70,7 @@ export function NotificationsMenu() {
           {canStock && (
             <section className="mt-3" aria-label="Validade">
               <h3 className="text-sm font-bold text-ink-600">Lotes vencidos ou críticos</h3>
-              {lots.isLoading ? <Skeleton className="mt-2 h-20" /> : lots.data && lots.data.items.length > 0 ? (
+              {lots.isError ? <ErrorState message={errorMessage(lots.error)} onRetry={() => void lots.refetch()} /> : lots.isLoading ? <Skeleton className="mt-2 h-20" /> : lots.data && lots.data.items.length > 0 ? (
                 <ul className="mt-2 divide-y divide-cream-100">
                   {lots.data.items.map((lot) => (
                     <li key={lot.id} className="flex items-start justify-between gap-2 py-2 text-sm">
@@ -87,6 +87,7 @@ export function NotificationsMenu() {
             </section>
           )}
 
+          {canFamilies && pending.isError && <ErrorState message={errorMessage(pending.error)} onRetry={() => void pending.refetch()} />}
           {canFamilies && pendingCount > 0 && (
             <section className="mt-4 border-t border-cream-100 pt-3" aria-label="Consentimentos">
               <Link to="/familias" className="text-sm font-semibold hover:underline">

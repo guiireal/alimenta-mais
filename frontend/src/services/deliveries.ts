@@ -1,63 +1,32 @@
-import type { DeliveryRoute, DeliveryStatus, RouteInput, RouteStop } from '../types'
-import { ApiError, db, logAudit, nextId, nowIso, simulate } from './db'
-
-const addMinutes = (time: string, minutes: number): string => {
-  const [h, m] = time.split(':').map(Number)
-  const total = (h * 60 + m + minutes) % (24 * 60)
-  return `${String(Math.floor(total / 60)).padStart(2, '0')}:${String(total % 60).padStart(2, '0')}`
+import type { DeliveryRoute, RouteInput, RouteStatus } from '../types'
+import { allPages, http } from './http'
+export interface RouteDTO {
+  id: number; reference_code: string; origin_warehouse_id: number; warehouse_name: string; scheduled_on: string; status: RouteStatus; assigned_name: string
+  stops: { id: number; family_id: number | null; stop_sequence: number | null; destination_address: string; description: string | null; scheduled_at: string | null; status: 'waiting' | 'in_transit' | 'delivered' | 'failed' | 'cancelled' }[]
 }
-
-export const listRoutes = (): Promise<DeliveryRoute[]> => simulate(() => db.routes)
-
-export const createRoute = (input: RouteInput): Promise<DeliveryRoute> =>
-  simulate(() => {
-    const families = input.familyIds.map((id) => {
-      const family = db.families.find((f) => f.id === id)
-      if (!family) throw new ApiError('Família não encontrada.', 404)
-      if (family.consent !== 'granted') throw new ApiError(`A família ${family.code} ainda não tem consentimento LGPD.`, 422)
-      return family
-    })
-    if (families.length === 0) throw new ApiError('Escolha ao menos uma família.', 422)
-
-    const stops: RouteStop[] = families.map((family, i) => ({
-      id: `S-${Date.now()}-${i}`,
-      order: i + 1,
-      destination: `Família ${family.code}`,
-      familyId: family.id,
-      items: 'Cesta básica',
-      eta: addMinutes(input.startTime, 40 * (i + 1)),
-      status: 'waiting',
-      x: 22 + ((i * 41) % 66),
-      y: 24 + ((i * 29) % 52),
-    }))
-    const route: DeliveryRoute = {
-      id: nextId('R', db.routes.map((r) => r.id), 2),
-      name: input.name.trim(),
-      driver: input.driver,
-      vehicle: input.vehicle,
-      depot: { x: 10, y: 30 + ((db.routes.length * 17) % 40) },
-      stops,
-    }
-    db.routes.push(route)
-    logAudit('Rota gerada', route.id)
-    return route
+export const routeFromAPI = (r: RouteDTO): DeliveryRoute => ({
+  id: String(r.id), name: r.reference_code, driver: r.assigned_name || 'Sem responsável', warehouse: r.warehouse_name,
+  warehouseId: String(r.origin_warehouse_id), scheduledOn: r.scheduled_on, status: r.status,
+  stops: r.stops.map((s) => ({ id: String(s.id), order: s.stop_sequence ?? 0, familyId: s.family_id ? String(s.family_id) : undefined,
+    destination: s.destination_address, items: s.description ?? 'Consultar itens da entrega',
+    eta: s.scheduled_at ? new Date(s.scheduled_at).toLocaleString('pt-BR') : 'Não informada', status: s.status === 'in_transit' ? 'en_route' : s.status,
+  })),
+})
+export const listRoutes = async (): Promise<DeliveryRoute[]> => (await allPages<RouteDTO>('/overview/routes')).map(routeFromAPI)
+export async function createRoute(input: RouteInput): Promise<{ id: string; name: string }> {
+  const route = await http.post<{ id: number; reference_code: string }>('/routes', {
+    reference_code: input.name, origin_warehouse_id: Number(input.warehouseId), scheduled_on: input.scheduledOn, assigned_to: input.assignedTo ? Number(input.assignedTo) : null,
   })
-
-const NEXT: Record<DeliveryStatus, DeliveryStatus | null> = { waiting: 'en_route', en_route: 'delivered', delivered: null }
-
-/** Avança a parada: aguardando, em rota, entregue. A entrega confirmada atualiza a família. */
-export const advanceStop = (routeId: string, stopId: string): Promise<DeliveryRoute> =>
-  simulate(() => {
-    const route = db.routes.find((r) => r.id === routeId)
-    const stop = route?.stops.find((s) => s.id === stopId)
-    if (!route || !stop) throw new ApiError('Parada não encontrada.', 404)
-    const next = NEXT[stop.status]
-    if (!next) throw new ApiError('Esta entrega já foi concluída.', 409)
-    stop.status = next
-    if (next === 'delivered' && stop.familyId) {
-      const family = db.families.find((f) => f.id === stop.familyId)
-      if (family) family.lastDeliveryAt = nowIso()
-    }
-    logAudit(next === 'delivered' ? 'Entrega confirmada' : 'Entrega iniciada', `${route.id}, parada ${stop.order}`)
-    return route
-  })
+  return { id: String(route.id), name: route.reference_code }
+}
+export async function advanceStop(_routeId: string, stopId: string, status: 'waiting' | 'en_route') {
+  if (status === 'waiting') await http.post('/deliveries/' + stopId + '/dispatch')
+  else await http.put('/deliveries/' + stopId + '/status', { status: 'delivered' })
+}
+export const setRouteStatus = (id: string, status: RouteStatus) => http.put('/routes/' + id + '/status', { status })
+export interface DeliveryInput { routeId: string; warehouseId: string; familyId: string; address: string; order: string; description: string; items: { productId: string; quantity: string }[] }
+export const createDelivery = (input: DeliveryInput) => http.post('/deliveries', {
+  route_id: Number(input.routeId), source_warehouse_id: Number(input.warehouseId), family_id: Number(input.familyId),
+  destination_address: input.address, stop_sequence: Number(input.order), description: input.description || null,
+  items: input.items.map((i) => ({ product_id: Number(i.productId), quantity: i.quantity.trim().replace(',', '.') })),
+})

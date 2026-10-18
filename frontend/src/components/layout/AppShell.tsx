@@ -5,6 +5,8 @@ import { BarChart3, Boxes, Building2, HandHeart, LayoutDashboard, LogOut, Menu, 
 import { useAuth } from '../../context/AuthContext'
 import { cn } from '../../lib/utils'
 import { ROLE_LABEL } from '../../lib/permissions'
+import { useToast } from '../../context/ToastContext'
+import { errorMessage } from '../../lib/utils'
 import type { Permission } from '../../types'
 import { ErrorBoundary } from '../ErrorBoundary'
 import { NotificationsMenu } from '../NotificationsMenu'
@@ -14,7 +16,8 @@ import { Skeleton } from '../ui'
 interface NavItem { to: string; label: string; icon: LucideIcon; permission?: Permission }
 
 const NAV: NavItem[] = [
-  { to: '/', label: 'Dashboard', icon: LayoutDashboard },
+  { to: '/', label: 'Dashboard', icon: LayoutDashboard, permission: 'report:read' },
+  { to: '/cadastros', label: 'Cadastros', icon: Building2, permission: 'stock:write' },
   { to: '/doacoes', label: 'Doações', icon: HandHeart, permission: 'donation:read' },
   { to: '/estoque', label: 'Estoque e Validade', icon: Boxes, permission: 'stock:read' },
   { to: '/familias', label: 'Famílias', icon: Users, permission: 'family:read' },
@@ -26,6 +29,8 @@ const NAV: NavItem[] = [
 
 export default function AppShell() {
   const { user, logout, can } = useAuth()
+  const toast = useToast()
+  const [signingOut, setSigningOut] = useState(false)
   const navigate = useNavigate()
   const { pathname } = useLocation()
   const [open, setOpen] = useState(false)
@@ -91,7 +96,13 @@ export default function AppShell() {
             <p className="text-xs text-leaf-100">{ROLE_LABEL[user.role]}</p>
             <button
               type="button"
-              onClick={() => { logout(); navigate('/login') }}
+              disabled={signingOut}
+              onClick={async () => {
+                setSigningOut(true)
+                try { await logout(); navigate('/login') }
+                catch (error) { toast.error(errorMessage(error)) }
+                finally { setSigningOut(false) }
+              }}
               className="mt-3 flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm font-semibold text-leaf-100 hover:bg-leaf-800"
             >
               <LogOut size={16} aria-hidden="true" />Sair

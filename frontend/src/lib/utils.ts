@@ -4,22 +4,19 @@ export const cn = (...parts: Array<string | false | null | undefined>): string =
   parts.filter(Boolean).join(' ')
 
 const DAY_MS = 86_400_000
-const startOfDay = (d: Date): Date => {
-  const copy = new Date(d)
-  copy.setHours(0, 0, 0, 0)
-  return copy
-}
+const utcDay = (date: Date): number => Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate())
 
+const asDate = (iso: string) => new Date(/^\d{4}-\d{2}-\d{2}$/.test(iso) ? `${iso}T12:00:00` : iso)
 export const daysUntil = (iso: string): number =>
-  Math.round((startOfDay(new Date(iso)).getTime() - startOfDay(new Date()).getTime()) / DAY_MS)
+  Math.round((utcDay(new Date(iso)) - utcDay(new Date())) / DAY_MS)
 
-/** Regra de negócio: até 3 dias é crítico, até 14 dias pede atenção. */
+/** Same boundaries used by the API's inventory filters. */
 export const getExpiryStatus = (iso: string | null): ExpiryStatus => {
   if (!iso) return 'none'
   const days = daysUntil(iso)
   if (days < 0) return 'expired'
-  if (days <= 3) return 'critical'
-  if (days <= 14) return 'warning'
+  if (days <= 2) return 'critical'
+  if (days <= 7) return 'warning'
   return 'ok'
 }
 
@@ -35,6 +32,8 @@ export const DELIVERY_META: Record<DeliveryStatus, { label: string; tone: Tone; 
   delivered: { label: 'Entregue', tone: 'green', pin: 'bg-leaf-600 text-white' },
   en_route: { label: 'Em rota', tone: 'orange', pin: 'bg-carrot-500 text-ink-900' },
   waiting: { label: 'Aguardando', tone: 'neutral', pin: 'bg-white text-ink-900 border-2 border-cream-500' },
+  failed: { label: 'Não realizada', tone: 'red', pin: '' },
+  cancelled: { label: 'Cancelada', tone: 'neutral', pin: '' },
 }
 
 export const daysLabel = (iso: string | null): string => {
@@ -46,7 +45,7 @@ export const daysLabel = (iso: string | null): string => {
   return `vence em ${days} ${unit(days)}`
 }
 
-export const formatDate = (iso: string): string => new Intl.DateTimeFormat('pt-BR').format(new Date(iso))
+export const formatDate = (iso: string): string => new Intl.DateTimeFormat('pt-BR').format(asDate(iso))
 export const formatNumber = (n: number): string => new Intl.NumberFormat('pt-BR').format(n)
 
 /** FEFO: primeiro que vence, primeiro que sai. Lotes sem validade vão para o fim. */
@@ -81,4 +80,4 @@ export const defaultWarehouse = (category: Category): Warehouse =>
 export const isPerishable = (category: Category): boolean => defaultWarehouse(category) === 'Câmara fria'
 
 export const errorMessage = (error: unknown): string =>
-  error instanceof Error ? error.message : 'Algo deu errado. Tente novamente.'
+  error instanceof Error ? [error.message, ...Object.values((error as Error & { fields?: Record<string, string> }).fields ?? {})].join('. ') : 'Algo deu errado. Tente novamente.'

@@ -1,4 +1,4 @@
-import { Link } from 'react-router-dom'
+import { Link, Navigate } from 'react-router-dom'
 import { BarChart } from '../components/BarChart'
 import { ExpiryBadge } from '../components/ExpiryBadge'
 import { ShelfLife } from '../components/ShelfLife'
@@ -18,9 +18,10 @@ function DashboardSkeleton() {
 
 export default function Dashboard() {
   const { can } = useAuth()
-  const dash = useDashboard()
+  const dash = useDashboard(can('report:read'))
   const data = dash.data
-  const maxLoss = data ? Math.max(...data.loss.map((l) => l.kg)) : 1
+  const maxLoss = Math.max(1, ...data?.loss.map((l) => l.kg) ?? [])
+  if (!can('report:read')) return <Navigate to="/estoque" replace />
 
   return (
     <>
@@ -30,7 +31,7 @@ export default function Dashboard() {
           <>
             <StatStrip
               stats={[
-                { label: 'Volume doado no mês', value: `${formatNumber(data.kpis.donatedKg)} kg` },
+                { label: 'Volume doado no período', value: `${formatNumber(data.kpis.donatedKg)} kg` },
                 { label: 'Rotatividade do estoque', value: `${data.kpis.turnover.toLocaleString('pt-BR')}x` },
                 { label: 'Tempo médio de entrega', value: `${data.kpis.avgDeliveryHours.toLocaleString('pt-BR')} h` },
                 { label: 'Cobertura de famílias', value: `${data.kpis.coveragePct}%` },
@@ -58,7 +59,7 @@ export default function Dashboard() {
             </div>
 
             <div className="grid gap-4 lg:grid-cols-2">
-              <Card title="Perdas por vencimento (kg no mês)">
+              <Card title="Perdas por categoria (kg no período)">
                 <ul className="space-y-3">
                   {data.loss.map((l) => (
                     <li key={l.category} className="grid grid-cols-[6.5rem_1fr_3rem] items-center gap-3 text-sm">
@@ -70,7 +71,7 @@ export default function Dashboard() {
                 </ul>
               </Card>
 
-              <Card title="Entregas de hoje" action={can('delivery:read') ? <Link to="/entregas" className="text-sm font-bold text-leaf-700 hover:underline">Ver rotas</Link> : undefined}>
+              <Card title="Resumo de rotas" action={can('delivery:read') ? <Link to="/entregas" className="text-sm font-bold text-leaf-700 hover:underline">Ver rotas</Link> : undefined}>
                 <ul className="space-y-4">
                   {data.routes.map((r) => (
                     <li key={r.id}>
@@ -79,7 +80,7 @@ export default function Dashboard() {
                         <span className="text-ink-600">{r.done} de {r.total} entregues</span>
                       </div>
                       <div className="mt-2 h-2.5 overflow-hidden rounded-full bg-cream-100" role="img" aria-label={`${r.done} de ${r.total} paradas entregues`}>
-                        <div className="h-full rounded-full bg-leaf-600" style={{ width: `${(r.done / r.total) * 100}%` }} />
+                        <div className="h-full rounded-full bg-leaf-600" style={{ width: `${(r.done / Math.max(1, r.total)) * 100}%` }} />
                       </div>
                     </li>
                   ))}

@@ -6,12 +6,10 @@ import * as donations from '../services/donations'
 import * as families from '../services/families'
 import * as searchService from '../services/search'
 import * as stock from '../services/stock'
-import type { ConsentStatus, DisposalReason, LotQuery, Role, Warehouse } from '../types'
+import * as catalog from '../services/catalog'
+import type { ConsentStatus, LotQuery, Role, RouteStatus } from '../types'
 
-/**
- * Todas as leituras e escritas passam por aqui. As telas não conhecem o service:
- * se a origem dos dados mudar (mock para API), só os services são alterados.
- */
+/** Shared query keys keep reads synchronized after server mutations. */
 const refresh = (qc: QueryClient, ...roots: string[]) =>
   Promise.all([...roots, 'audit'].map((root) => qc.invalidateQueries({ queryKey: [root] })))
 
@@ -30,14 +28,14 @@ export const useCreateLot = () => {
 export const useTransferLot = () => {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: (v: { id: string; warehouse: Warehouse }) => stock.transferLot(v.id, v.warehouse),
+    mutationFn: stock.transferLot,
     onSuccess: () => refresh(qc, ...STOCK_ROOTS),
   })
 }
 export const useDisposeLot = () => {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: (v: { id: string; reason: DisposalReason }) => stock.disposeLot(v.id, v.reason),
+    mutationFn: stock.disposeLot,
     onSuccess: () => refresh(qc, ...STOCK_ROOTS),
   })
 }
@@ -80,13 +78,13 @@ export const useCreateRoute = () => {
 export const useAdvanceStop = () => {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: (v: { routeId: string; stopId: string }) => deliveries.advanceStop(v.routeId, v.stopId),
+    mutationFn: (v: { routeId: string; stopId: string; status: 'waiting' | 'en_route' }) => deliveries.advanceStop(v.routeId, v.stopId, v.status),
     onSuccess: () => refresh(qc, 'routes', 'dashboard', 'families', 'family'),
   })
 }
 
 /* ---------- painéis, busca e acesso ---------- */
-export const useDashboard = () => useQuery({ queryKey: ['dashboard'], queryFn: dashboard.getDashboard })
+export const useDashboard = (enabled = true) => useQuery({ queryKey: ['dashboard'], queryFn: dashboard.getDashboard, enabled })
 export const useReports = (months: number) =>
   useQuery({ queryKey: ['reports', months], queryFn: () => dashboard.getReports(months), placeholderData: keepPreviousData })
 
@@ -102,11 +100,21 @@ export const useAudit = () => useQuery({ queryKey: ['audit'], queryFn: access.li
 export const useUpdateUser = () => {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: (v: { id: string; patch: { role?: Role; active?: boolean }; actorId: string }) => access.updateUser(v.id, v.patch, v.actorId),
+    mutationFn: (v: { id: string; patch: { role: Role; active: boolean } }) => access.updateUser(v.id, v.patch),
     onSuccess: () => refresh(qc, 'users'),
   })
 }
 
 /** Exportação: busca todos os lotes do filtro atual, sem paginação. */
 export const useExportLots = () =>
-  useMutation({ mutationFn: (query: LotQuery) => stock.listLots({ ...query, page: 1, pageSize: 1000 }) })
+  useMutation({ mutationFn: stock.exportLots })
+
+export const useCatalog = () => useQuery({ queryKey: ['catalog'], queryFn: catalog.getCatalog })
+export const useCreateCategory = () => { const qc = useQueryClient(); return useMutation({ mutationFn: catalog.createCategory, onSuccess: () => refresh(qc, 'catalog') }) }
+export const useCreateProduct = () => { const qc = useQueryClient(); return useMutation({ mutationFn: catalog.createProduct, onSuccess: () => refresh(qc, 'catalog') }) }
+export const useCreateWarehouse = () => { const qc = useQueryClient(); return useMutation({ mutationFn: catalog.createWarehouse, onSuccess: () => refresh(qc, 'catalog') }) }
+export const useDonation = (id: string) => useQuery({ queryKey: ['donation', id], queryFn: () => donations.getDonation(id), enabled: Boolean(id) })
+export const useTriageBatch = () => { const qc = useQueryClient(); return useMutation({ mutationFn: donations.triageBatch, onSuccess: () => refresh(qc, 'donation', 'donations', ...STOCK_ROOTS) }) }
+export const useConfirmDonation = () => { const qc = useQueryClient(); return useMutation({ mutationFn: donations.confirmDonation, onSuccess: () => refresh(qc, 'donation', 'donations', ...STOCK_ROOTS) }) }
+export const useSetRouteStatus = () => { const qc = useQueryClient(); return useMutation({ mutationFn: (v: { id: string; status: RouteStatus }) => deliveries.setRouteStatus(v.id, v.status), onSuccess: () => refresh(qc, 'routes') }) }
+export const useCreateDelivery = () => { const qc = useQueryClient(); return useMutation({ mutationFn: deliveries.createDelivery, onSuccess: () => refresh(qc, 'routes', ...STOCK_ROOTS) }) }

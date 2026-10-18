@@ -37,6 +37,8 @@ export default function FamilyDetail() {
             <FormError error={!confirmRevoke ? setConsent.error : null} />
             <Card title="Resumo">
               <dl className="grid grid-cols-2 gap-4 text-sm sm:grid-cols-3">
+                <div><dt className="text-ink-600">Responsável</dt><dd className="font-bold">{family.contactName}</dd></div>
+                <div><dt className="text-ink-600">Endereço</dt><dd>{family.address}, {family.city}/{family.state}</dd></div>
                 <div><dt className="text-ink-600">Pessoas</dt><dd className="font-bold">{family.members}</dd></div>
                 <div><dt className="text-ink-600">Consentimento LGPD</dt><dd><Badge tone={family.consent === 'granted' ? 'green' : 'orange'}>{family.consent === 'granted' ? 'Consentimento ok' : 'Pendente'}</Badge></dd></div>
                 <div><dt className="text-ink-600">Última entrega</dt><dd className="font-bold">{family.lastDeliveryAt ? formatDate(family.lastDeliveryAt) : 'Sem entregas'}</dd></div>

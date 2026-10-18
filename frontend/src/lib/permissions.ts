@@ -4,22 +4,17 @@ const READ: Permission[] = [
   'stock:read', 'donation:read', 'donor:read', 'family:read', 'delivery:read', 'report:read', 'access:read',
 ]
 
-/**
- * Matriz de perfis. No sistema real o backend valida cada requisição;
- * aqui ela só decide o que o front mostra, esconde ou bloqueia.
- */
+/** The API enforces access; this matrix controls navigation and visible actions. */
 export const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
-  manager: [...READ, 'stock:write', 'stock:dispose', 'donation:write', 'donor:write', 'family:write', 'delivery:write', 'access:write'],
-  logistics: ['stock:read', 'stock:write', 'donation:read', 'donor:read', 'family:read', 'delivery:read', 'delivery:write', 'report:read'],
-  volunteer: ['stock:read', 'donation:read', 'donation:write', 'donor:read'],
-  auditor: READ,
+  administrator: [...READ, 'stock:write', 'stock:dispose', 'donation:write', 'donor:write', 'family:write', 'delivery:write', 'access:write'],
+  manager: [...READ, 'stock:write', 'stock:dispose', 'donation:write', 'donor:write', 'family:write', 'delivery:write'],
+  operator: ['stock:read', 'donation:read', 'donation:write', 'donor:read'],
 }
 
 export const ROLE_LABEL: Record<Role, string> = {
   manager: 'Gestor',
-  logistics: 'Logística',
-  volunteer: 'Voluntário',
-  auditor: 'Auditor',
+  administrator: 'Administrador',
+  operator: 'Operador',
 }
 
 export const PERMISSION_LABEL: Record<Permission, string> = {

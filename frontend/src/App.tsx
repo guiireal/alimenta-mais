@@ -16,6 +16,8 @@ const FamilyForm = lazy(() => import('./pages/FamilyForm'))
 const FamilyDetail = lazy(() => import('./pages/FamilyDetail'))
 const Deliveries = lazy(() => import('./pages/Deliveries'))
 const RouteForm = lazy(() => import('./pages/RouteForm'))
+const DeliveryForm = lazy(() => import('./pages/DeliveryForm'))
+const Catalog = lazy(() => import('./pages/Catalog'))
 const Donors = lazy(() => import('./pages/Donors'))
 const DonorForm = lazy(() => import('./pages/DonorForm'))
 const DonorDetail = lazy(() => import('./pages/DonorDetail'))
@@ -44,6 +46,7 @@ export default function App() {
               <Route path="estoque/:id" element={<LotDetail />} />
             </Route>
             <Route element={<RequirePermission permission="stock:write" />}>
+              <Route path="cadastros" element={<Catalog />} />
               <Route path="estoque/novo" element={<LotForm />} />
             </Route>
 
@@ -59,6 +62,7 @@ export default function App() {
               <Route path="entregas" element={<Deliveries />} />
             </Route>
             <Route element={<RequirePermission permission="delivery:write" />}>
+              <Route path="entregas/:id/nova" element={<DeliveryForm />} />
               <Route path="entregas/nova" element={<RouteForm />} />
             </Route>
 

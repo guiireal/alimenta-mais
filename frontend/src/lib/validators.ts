@@ -1,5 +1,5 @@
-import type { Category, TriageStatus } from '../types'
-import { isPerishable, onlyDigits, parseNumber, todayInput } from './utils'
+import type { TriageStatus } from '../types'
+import { onlyDigits, todayInput } from './utils'
 
 export type Errors<T> = Partial<Record<keyof T, string>>
 export const hasErrors = (errors: object): boolean => Object.values(errors).some(Boolean)
@@ -21,6 +21,7 @@ export type RegisterValues = { name: string; email: string; password: string; co
 export const passwordProblem = (password: string): string | undefined =>
   !password ? REQUIRED
   : password.length < 8 ? 'Use ao menos 8 caracteres'
+  : new TextEncoder().encode(password).length > 72 ? 'Use no máximo 72 bytes'
   : !/[A-Za-z]/.test(password) || !/\d/.test(password) ? 'Misture letras e números'
   : undefined
 export const validateRegister = (v: RegisterValues): Errors<RegisterValues> => ({
@@ -32,15 +33,18 @@ export const validateRegister = (v: RegisterValues): Errors<RegisterValues> => (
 })
 
 /* ---------- lote ---------- */
-export type LotValues = { item: string; category: string; quantity: string; unit: string; expiresAt: string; warehouse: string }
-export const validateLot = (v: LotValues): Errors<LotValues> => {
-  const qty = parseNumber(v.quantity)
+export type LotValues = { productId: string; batchCode: string; quantity: string; unitWeightKg: string; expiresAt: string; warehouse: string }
+export const decimalProblem = (value: string, scale = 3): string | undefined =>
+  !new RegExp(`^\\d+(?:[.,]\\d{1,${scale}})?$`).test(value.trim()) || Number(value.replace(',', '.')) <= 0 ? `Informe um valor positivo com até ${scale} casas decimais` : undefined
+export const validateLot = (v: LotValues, approved = true): Errors<LotValues> => {
+  const today = new Date().toISOString().slice(0, 10)
   return {
-    item: !v.item.trim() ? REQUIRED : v.item.trim().length < 3 ? 'Use ao menos 3 caracteres' : undefined,
-    category: !v.category ? REQUIRED : undefined,
-    quantity: !v.quantity.trim() ? REQUIRED : !Number.isFinite(qty) || qty <= 0 ? 'Informe uma quantidade maior que zero' : v.unit === 'un' && !Number.isInteger(qty) ? 'Unidades devem ser números inteiros' : undefined,
-    expiresAt: v.expiresAt && v.expiresAt < todayInput() ? 'Item vencido não pode dar entrada no estoque' : undefined,
-    warehouse: !v.warehouse ? REQUIRED : v.category && isPerishable(v.category as Category) && v.warehouse !== 'Câmara fria' ? 'Perecíveis devem ficar na câmara fria' : undefined,
+    productId: !v.productId ? REQUIRED : undefined,
+    batchCode: !v.batchCode.trim() ? REQUIRED : undefined,
+    quantity: decimalProblem(v.quantity),
+    unitWeightKg: decimalProblem(v.unitWeightKg, 6),
+    expiresAt: approved && !v.expiresAt ? REQUIRED : approved && v.expiresAt < today ? 'Item vencido não pode dar entrada no estoque' : undefined,
+    warehouse: approved && !v.warehouse ? REQUIRED : undefined,
   }
 }
 
@@ -57,31 +61,34 @@ export const validateDonor = (v: DonorValues): Errors<DonorValues> => {
 }
 
 /* ---------- família ---------- */
-export type FamilyValues = { neighborhood: string; members: string; consent: boolean }
+export type FamilyValues = { code: string; contactName: string; address: string; neighborhood: string; city: string; state: string; members: string }
 export const validateFamily = (v: FamilyValues): Errors<FamilyValues> => {
   const n = Number(v.members)
   return {
+    code: !v.code.trim() ? REQUIRED : undefined,
+    contactName: !v.contactName.trim() ? REQUIRED : undefined,
+    address: !v.address.trim() ? REQUIRED : undefined,
     neighborhood: !v.neighborhood.trim() ? REQUIRED : undefined,
+    city: !v.city.trim() ? REQUIRED : undefined,
+    state: !/^[A-Z]{2}$/.test(v.state) ? 'Informe a UF com duas letras maiúsculas' : undefined,
     members: !v.members.trim() ? REQUIRED : !Number.isInteger(n) || n < 1 || n > 20 ? 'Informe de 1 a 20 pessoas' : undefined,
   }
 }
 
 /* ---------- rota ---------- */
-export type RouteValues = { name: string; vehicle: string; driver: string; startTime: string; familyIds: string[] }
+export type RouteValues = { name: string; warehouseId: string; scheduledOn: string; assignedTo: string }
 export const validateRoute = (v: RouteValues): Errors<RouteValues> => ({
   name: !v.name.trim() ? REQUIRED : undefined,
-  vehicle: !v.vehicle ? REQUIRED : undefined,
-  driver: !v.driver ? REQUIRED : undefined,
-  startTime: !v.startTime ? REQUIRED : undefined,
-  familyIds: v.familyIds.length === 0 ? 'Escolha ao menos uma família' : undefined,
+  warehouseId: !v.warehouseId ? REQUIRED : undefined,
+  scheduledOn: !v.scheduledOn ? REQUIRED : undefined,
 })
 
 /* ---------- baixa de lote ---------- */
 export const validateDisposal = (reason: string): string | undefined => (reason ? undefined : 'Escolha o motivo da baixa')
 
 /* ---------- doação (itens dinâmicos) ---------- */
-export interface DraftItem { key: string; name: string; category: string; quantity: string; expiresAt: string; triage: TriageStatus }
-type ItemField = 'name' | 'category' | 'quantity' | 'expiresAt'
+export type DraftItem = LotValues & { key: string; triage: TriageStatus }
+type ItemField = keyof LotValues
 export interface DonationErrors {
   donorId?: string
   receivedAt?: string
@@ -93,16 +100,7 @@ export const validateDonation = (v: { donorId: string; receivedAt: string; items
   const today = todayInput()
   const byItem: DonationErrors['byItem'] = {}
   for (const item of v.items) {
-    const qty = parseNumber(item.quantity)
-    const e: Partial<Record<ItemField, string>> = {
-      name: !item.name.trim() ? REQUIRED : undefined,
-      category: !item.category ? REQUIRED : undefined,
-      quantity: !item.quantity.trim() ? REQUIRED : !Number.isFinite(qty) || qty <= 0 ? 'Quantidade maior que zero' : undefined,
-      expiresAt:
-        item.triage === 'approved' && !item.expiresAt ? 'Validade obrigatória para item aprovado'
-        : item.expiresAt && item.expiresAt < today && item.triage === 'approved' ? 'Item vencido não pode ser aprovado'
-        : undefined,
-    }
+    const e = validateLot(item, item.triage === 'approved')
     if (hasErrors(e)) byItem[item.key] = e
   }
   return {

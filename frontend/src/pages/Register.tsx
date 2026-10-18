@@ -8,7 +8,7 @@ import { validateRegister, type RegisterValues } from '../lib/validators'
 
 export default function Register() {
   useDocumentTitle('Criar conta')
-  const { user, register } = useAuth()
+  const { user, register, loading } = useAuth()
   const [serverError, setServerError] = useState<unknown>(null)
   const [pending, setPending] = useState(false)
   const [showPassword, setShowPassword] = useState(false)
@@ -76,8 +76,8 @@ export default function Register() {
             {form.errors.accept && <p id="aceite-erro" className="mt-1 text-sm font-semibold text-tomato-600">{form.errors.accept}</p>}
           </div>
 
-          <p className="rounded-lg bg-cream-100 px-3 py-2 text-sm text-ink-600">Contas novas começam como Voluntário. O gestor pode ampliar o seu acesso depois.</p>
-          <Button type="submit" className="w-full" disabled={pending}>{pending ? 'Criando conta…' : 'Criar conta'}</Button>
+          <p className="rounded-lg bg-cream-100 px-3 py-2 text-sm text-ink-600">Contas novas começam como Operador. O administrador pode ampliar o seu acesso depois.</p>
+          <Button type="submit" className="w-full" disabled={pending || loading}>{loading ? 'Verificando sessão…' : pending ? 'Criando conta…' : 'Criar conta'}</Button>
         </form>
 
         <p className="text-center text-sm">Já tem conta? <Link to="/login" className="font-bold text-leaf-700 hover:underline">Entrar</Link></p>

@@ -2,7 +2,7 @@ import type { MonthlyPoint } from '../types'
 import { formatNumber } from '../lib/utils'
 
 export function BarChart({ data }: { data: MonthlyPoint[] }) {
-  const max = Math.max(...data.map((d) => Math.max(d.donated, d.distributed)))
+  const max = Math.max(1, ...data.map((d) => Math.max(d.donated, d.distributed)))
   const summary = data.map((d) => `${d.month}: ${formatNumber(d.donated)} kg doados, ${formatNumber(d.distributed)} kg distribuídos`).join('; ')
   return (
     <figure>

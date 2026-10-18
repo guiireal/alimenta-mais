@@ -4,45 +4,24 @@ import { useToast } from '../context/ToastContext'
 import { useCreateFamily } from '../hooks/queries'
 import { useForm } from '../lib/hooks'
 import { validateFamily, type FamilyValues } from '../lib/validators'
-
 export default function FamilyForm() {
   const navigate = useNavigate()
   const toast = useToast()
-  const createFamily = useCreateFamily()
-  const form = useForm<FamilyValues>({ neighborhood: '', members: '', consent: false }, validateFamily)
-
-  const onSubmit = form.submit((v) =>
-    createFamily.mutate(
-      { neighborhood: v.neighborhood, members: Number(v.members), consent: v.consent },
-      { onSuccess: (family) => { toast.success(`Família ${family.code} cadastrada.`); navigate(`/familias/${family.id}`) } },
-    ),
-  )
-
-  return (
-    <>
-      <BackLink to="/familias">Voltar às famílias</BackLink>
-      <PageHeader title="Cadastrar família" description="Colete só o necessário para a entrega. Sem consentimento, a família não entra em rotas." />
-      <Card className="max-w-3xl">
-        <form onSubmit={onSubmit} noValidate className="space-y-4">
-          <FormError error={createFamily.error} />
-          <div className="grid gap-4 sm:grid-cols-2">
-            <Field label="Bairro" error={form.errors.neighborhood}>
-              {(a11y) => <input {...a11y} {...form.bind('neighborhood')} className={controlClass} />}
-            </Field>
-            <Field label="Pessoas na família" error={form.errors.members}>
-              {(a11y) => <input {...a11y} {...form.bind('members')} type="number" min={1} max={20} inputMode="numeric" className={controlClass} />}
-            </Field>
-          </div>
-          <label className="flex items-start gap-3 text-sm">
-            <input type="checkbox" checked={form.values.consent} onChange={(e) => form.setValue('consent', e.target.checked)} className="mt-0.5 size-4 accent-leaf-600" />
-            <span><span className="font-bold">Consentimento LGPD recebido</span><br /><span className="text-ink-600">A família autorizou o uso dos dados para organizar entregas.</span></span>
-          </label>
-          <div className="flex justify-end gap-2">
-            <LinkButton to="/familias" variant="secondary">Cancelar</LinkButton>
-            <Button type="submit" disabled={createFamily.isPending}>{createFamily.isPending ? 'Salvando…' : 'Salvar cadastro'}</Button>
-          </div>
-        </form>
-      </Card>
-    </>
-  )
+  const create = useCreateFamily()
+  const form = useForm<FamilyValues>({ code: '', contactName: '', address: '', neighborhood: '', city: '', state: 'SP', members: '' }, validateFamily)
+  const fields: { key: keyof FamilyValues; label: string }[] = [
+    { key: 'code', label: 'Código de referência' }, { key: 'contactName', label: 'Nome do responsável' },
+    { key: 'address', label: 'Endereço completo' }, { key: 'neighborhood', label: 'Bairro' },
+    { key: 'city', label: 'Cidade' }, { key: 'state', label: 'UF' }, { key: 'members', label: 'Pessoas na família' },
+  ]
+  const submit = form.submit((v) => create.mutate({ ...v, members: Number(v.members) }, { onSuccess: (family) => { toast.success('Família cadastrada. Registre o consentimento recebido.'); navigate('/familias/' + family.id) } }))
+  return <>
+    <BackLink to="/familias">Voltar às famílias</BackLink>
+    <PageHeader title="Cadastrar família" description="Após salvar, registre o consentimento recebido para habilitar as entregas." />
+    <Card className="max-w-3xl"><form onSubmit={submit} noValidate className="space-y-4">
+      <FormError error={create.error} /><div className="grid gap-4 sm:grid-cols-2">
+        {fields.map(({ key, label }) => <Field key={key} label={label} error={form.errors[key]}>{(a11y) => <input {...a11y} {...form.bind(key)} type={key === 'members' ? 'number' : 'text'} className={controlClass} />}</Field>)}
+      </div><div className="flex justify-end gap-2"><LinkButton to="/familias" variant="secondary">Cancelar</LinkButton><Button type="submit" disabled={create.isPending}>Salvar cadastro</Button></div>
+    </form></Card>
+  </>
 }

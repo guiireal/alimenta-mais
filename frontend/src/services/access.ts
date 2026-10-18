@@ -1,18 +1,10 @@
 import type { AppUser, AuditEntry, Role } from '../types'
-import { ApiError, db, logAudit, persistUsers, simulate } from './db'
-
-export const listUsers = (): Promise<AppUser[]> => simulate(() => db.users)
-export const listAudit = (): Promise<AuditEntry[]> => simulate(() => db.audit)
-
-export const updateUser = (id: string, patch: { role?: Role; active?: boolean }, actorId: string): Promise<AppUser> =>
-  simulate(() => {
-    const user = db.users.find((u) => u.id === id)
-    if (!user) throw new ApiError('Usuário não encontrado.', 404)
-    if (id === actorId) throw new ApiError('Você não pode alterar o próprio acesso.', 409)
-    const after = db.users.map((u) => (u.id === id ? { ...u, ...patch } : u))
-    if (!after.some((u) => u.role === 'manager' && u.active)) throw new ApiError('O sistema precisa de ao menos um gestor ativo.', 409)
-    Object.assign(user, patch)
-    persistUsers()
-    logAudit(patch.role ? 'Perfil de acesso alterado' : user.active ? 'Usuário reativado' : 'Usuário desativado', id)
-    return user
-  })
+import { allPages, http, type Page } from './http'
+import { userFromAPI, type UserDTO } from './auth'
+export const listUsers = async (): Promise<AppUser[]> => (await allPages<UserDTO>('/users')).map(userFromAPI)
+export const listAudit = async (): Promise<AuditEntry[]> => {
+  const data = await http.get<Page<{ id: number; occurred_at: string; actor_id: number | null; action: string; entity_table: string | null; entity_id: number | null }>>('/audit', { page_size: 100 })
+  return data.items.map((a) => ({ id: String(a.id), at: a.occurred_at, user: a.actor_id ? 'Usuário #' + a.actor_id : 'Sistema', action: a.action, entity: (a.entity_table ?? '') + ' #' + (a.entity_id ?? '') }))
+}
+export const updateUser = async (id: string, access: { role: Role; active: boolean }): Promise<AppUser> =>
+  userFromAPI(await http.put<UserDTO>('/users/' + id + '/access', { role: access.role, is_active: access.active }))

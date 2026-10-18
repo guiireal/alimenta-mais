@@ -3,16 +3,15 @@ import { Download, Plus, Search } from 'lucide-react'
 import { ExpiryBadge } from '../components/ExpiryBadge'
 import { Pagination } from '../components/Pagination'
 import { ShelfLife } from '../components/ShelfLife'
-import { AsyncBoundary, Button, Card, controlClass, EmptyRow, LinkButton, PageHeader, Skeleton, SortHeader, StatStrip, TableScroll, tdClass, thClass } from '../components/ui'
+import { AsyncBoundary, Button, Card, controlClass, EmptyRow, ErrorState, LinkButton, PageHeader, Skeleton, SortHeader, StatStrip, TableScroll, tdClass, thClass } from '../components/ui'
 import { useAuth } from '../context/AuthContext'
-import { useExportLots, useLots, useStockStats } from '../hooks/queries'
+import { useCatalog, useExportLots, useLots, useStockStats } from '../hooks/queries'
 import { useToast } from '../context/ToastContext'
 import { downloadCsv } from '../lib/csv'
 import { useDebouncedValue } from '../lib/hooks'
 import { daysLabel, errorMessage, EXPIRY_META, formatDate, getExpiryStatus } from '../lib/utils'
 import type { Category, LotQuery, LotSortKey, LotStatusFilter, SortDir } from '../types'
 
-const CATEGORIES: readonly Category[] = ['Laticínios', 'Panificados', 'Grãos', 'Massas', 'Óleos', 'Hortifrúti']
 const STATUSES: readonly LotStatusFilter[] = ['all', 'alert', 'expired', 'critical', 'warning', 'ok', 'none']
 const SORTS: readonly LotSortKey[] = ['expiresAt', 'item', 'quantity', 'id']
 const STATUS_LABEL = (s: LotStatusFilter) => (s === 'all' ? 'Todas as situações' : s === 'alert' ? 'Vencidos e críticos' : EXPIRY_META[s].label)
@@ -25,14 +24,15 @@ export default function Inventory() {
   const { can } = useAuth()
   const toast = useToast()
   const [params, setParams] = useSearchParams()
+  const catalog = useCatalog()
 
   const query: LotQuery = {
     q: params.get('q') ?? '',
-    category: pick<Category | 'all'>(params.get('categoria'), [...CATEGORIES, 'all'], 'all'),
+    category: /^\d+$/.test(params.get('categoria') ?? '') ? params.get('categoria') as Category : 'all',
     status: pick(params.get('status'), STATUSES, 'all'),
     sort: pick(params.get('ordem'), SORTS, 'expiresAt'),
     dir: pick<SortDir>(params.get('dir'), ['asc', 'desc'], 'asc'),
-    page: Number(params.get('page')) || 1,
+    page: Math.max(1, Math.min(1000000, Math.trunc(Number(params.get('page')) || 1))),
   }
   const debouncedQ = useDebouncedValue(query.q ?? '', 300)
 
@@ -91,7 +91,7 @@ export default function Inventory() {
             { label: 'Lotes com validade registrada', value: `${stats.data.registeredPct}%` },
           ]}
         />
-      ) : <Skeleton className="h-24" />}
+      ) : stats.isError ? <ErrorState message={errorMessage(stats.error)} onRetry={() => void stats.refetch()} /> : <Skeleton className="h-24" />}
 
       <Card>
         <div className="mb-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
@@ -102,7 +102,7 @@ export default function Inventory() {
           </label>
           <select aria-label="Categoria" value={query.category} onChange={(e) => patch({ categoria: e.target.value === 'all' ? undefined : e.target.value })} className={controlClass}>
             <option value="all">Todas as categorias</option>
-            {CATEGORIES.map((c) => <option key={c} value={c}>{c}</option>)}
+            {catalog.data?.categories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
           </select>
           <select aria-label="Situação da validade" value={query.status} onChange={(e) => patch({ status: e.target.value === 'all' ? undefined : e.target.value })} className={controlClass}>
             {STATUSES.map((s) => <option key={s} value={s}>{STATUS_LABEL(s)}</option>)}

@@ -3,17 +3,16 @@ import { HandHeart } from 'lucide-react'
 import { Link, Navigate, useLocation, useNavigate } from 'react-router-dom'
 import { Button, controlClass, Field, FormError } from '../components/ui'
 import { useAuth } from '../context/AuthContext'
-import { DEMO_PASSWORD, users } from '../data/mock'
 import { useDocumentTitle, useForm } from '../lib/hooks'
-import { ROLE_LABEL } from '../lib/permissions'
 import { validateLogin, type LoginValues } from '../lib/validators'
 
 export default function Login() {
   useDocumentTitle('Entrar')
-  const { user, login } = useAuth()
+  const { user, login, loading, error, retry } = useAuth()
   const navigate = useNavigate()
   const location = useLocation()
-  const from = (location.state as { from?: string } | null)?.from ?? '/'
+  const requested = (location.state as { from?: string } | null)?.from
+  const from = requested?.startsWith('/') && !requested.startsWith('//') ? requested : '/'
   const [serverError, setServerError] = useState<unknown>(null)
   const [pending, setPending] = useState(false)
   const form = useForm<LoginValues>({ email: '', password: '' }, validateLogin)
@@ -45,36 +44,20 @@ export default function Login() {
         </div>
 
         <form onSubmit={onSubmit} noValidate className="space-y-4 rounded-xl border border-cream-200 bg-white p-5">
-          <FormError error={serverError} />
+          <FormError error={serverError || error} />
+          {error ? <Button variant="secondary" onClick={retry}>Verificar conexão novamente</Button> : null}
           <Field label="E-mail" error={form.errors.email}>
             {(a11y) => <input {...a11y} {...form.bind('email')} type="email" autoComplete="username" className={controlClass} />}
           </Field>
           <Field label="Senha" error={form.errors.password}>
             {(a11y) => <input {...a11y} {...form.bind('password')} type="password" autoComplete="current-password" className={controlClass} />}
           </Field>
-          <Button type="submit" className="w-full" disabled={pending}>{pending ? 'Entrando…' : 'Entrar'}</Button>
+          <Button type="submit" className="w-full" disabled={pending || loading}>{loading ? 'Verificando sessão…' : pending ? 'Entrando…' : 'Entrar'}</Button>
         </form>
 
         <p className="text-center text-sm">Não tem conta? <Link to="/cadastro" className="font-bold text-leaf-700 hover:underline">Criar conta</Link></p>
 
-        <section className="rounded-xl border border-dashed border-cream-300 p-4 text-sm">
-          <h2 className="font-bold">Perfis de demonstração</h2>
-          <p className="mt-1 text-ink-600">Cada perfil enxerga e altera telas diferentes. Clique para preencher o formulário (senha: {DEMO_PASSWORD}).</p>
-          <ul className="mt-3 grid gap-2 sm:grid-cols-2">
-            {users.filter((u) => u.active).map((u) => (
-              <li key={u.id}>
-                <button
-                  type="button"
-                  onClick={() => { form.setValue('email', u.email); form.setValue('password', DEMO_PASSWORD) }}
-                  className="w-full rounded-lg border border-cream-200 px-3 py-2 text-left hover:bg-cream-100"
-                >
-                  <span className="block font-bold">{u.name}</span>
-                  <span className="text-xs text-ink-600">{ROLE_LABEL[u.role]}</span>
-                </button>
-              </li>
-            ))}
-          </ul>
-        </section>
+
       </div>
     </div>
   )

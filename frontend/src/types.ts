@@ -2,29 +2,32 @@ export type Tone = 'green' | 'orange' | 'red' | 'neutral'
 
 /* ---------- estoque ---------- */
 export type ExpiryStatus = 'expired' | 'critical' | 'warning' | 'ok' | 'none'
-export type Category = 'Laticínios' | 'Panificados' | 'Grãos' | 'Massas' | 'Óleos' | 'Hortifrúti'
-export type Warehouse = 'Câmara fria' | 'Seco A' | 'Seco B'
+export type Category = string
+export type Warehouse = string
 export type LotStatus = 'active' | 'disposed'
 
 export interface StockLot {
   id: string
+  batchCode: string
+  productId: string
   item: string
   category: Category
   quantity: number
-  unit: 'un' | 'kg'
+  unit: string
   expiresAt: string | null
   warehouse: Warehouse
   status: LotStatus
+  balances: { warehouseId: string; warehouseName: string; quantity: string }[]
 }
 export interface LotInput {
-  item: string
-  category: Category
-  quantity: number
-  unit: 'un' | 'kg'
-  expiresAt: string | null
+  productId: string
+  batchCode: string
+  quantity: string
+  unitWeightKg: string
+  expiresAt: string
   warehouse: Warehouse
 }
-export type MovementType = 'entry' | 'transfer' | 'disposal'
+export type MovementType = 'entry' | 'transfer' | 'expiration_loss' | 'other_loss' | 'distribution' | 'return' | 'adjustment_out'
 export interface StockMovement {
   id: string
   lotId: string
@@ -81,7 +84,7 @@ export interface DonorInput {
   phone: string
 }
 export type TriageStatus = 'approved' | 'review' | 'rejected'
-export type DonationStage = 'received' | 'triage' | 'stored' | 'available'
+export type DonationStage = 'draft' | 'received' | 'triage' | 'stored' | 'available'
 export interface Donation {
   id: string
   donorId: string
@@ -92,11 +95,7 @@ export interface Donation {
   weightKg: number
   document?: string
 }
-export interface DonationItemInput {
-  name: string
-  category: Category
-  quantity: number
-  expiresAt: string | null
+export interface DonationItemInput extends LotInput {
   triage: TriageStatus
 }
 export interface DonationInput {
@@ -115,13 +114,22 @@ export interface Family {
   members: number
   consent: ConsentStatus
   lastDeliveryAt: string | null
+  contactName: string
+  address: string
+  city: string
+  state: string
+  active: boolean
 }
 export interface FamilyInput {
+  code: string
+  contactName: string
+  address: string
   neighborhood: string
+  city: string
+  state: string
   members: number
-  consent: boolean
 }
-export type DeliveryStatus = 'delivered' | 'en_route' | 'waiting'
+export type DeliveryStatus = 'delivered' | 'en_route' | 'waiting' | 'failed' | 'cancelled'
 export interface RouteStop {
   id: string
   order: number
@@ -130,28 +138,27 @@ export interface RouteStop {
   items: string
   eta: string
   status: DeliveryStatus
-  /** posição no mapa ilustrativo, em % */
-  x: number
-  y: number
 }
+export type RouteStatus = 'waiting' | 'in_transit' | 'completed' | 'cancelled'
 export interface DeliveryRoute {
   id: string
   name: string
   driver: string
-  vehicle: string
-  depot: { x: number; y: number }
+  warehouse: string
+  warehouseId: string
+  scheduledOn: string
+  status: RouteStatus
   stops: RouteStop[]
 }
 export interface RouteInput {
   name: string
-  vehicle: string
-  driver: string
-  startTime: string
-  familyIds: string[]
+  warehouseId: string
+  scheduledOn: string
+  assignedTo: string
 }
 
 /* ---------- acesso ---------- */
-export type Role = 'manager' | 'logistics' | 'volunteer' | 'auditor'
+export type Role = 'administrator' | 'manager' | 'operator'
 export type Permission =
   | 'stock:read' | 'stock:write' | 'stock:dispose'
   | 'donation:read' | 'donation:write'

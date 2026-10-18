@@ -1,52 +1,19 @@
-import { DEMO_PASSWORD } from '../data/mock'
-import { passwordProblem } from '../lib/validators'
 import type { AppUser } from '../types'
-import { ApiError, db, logAudit, nextId, persistUsers, simulate } from './db'
+import { http } from './http'
+import { errorMessage } from '../lib/utils'
 
-/**
- * Só existe no mock. Num backend real a senha viaja por HTTPS e o servidor guarda
- * um hash lento com sal (argon2 ou bcrypt); o front nunca calcula nem guarda hash de senha.
- */
-async function hashPassword(email: string, password: string): Promise<string> {
-  const data = new TextEncoder().encode(`${email.trim().toLowerCase()}:${password}`)
-  const digest = await crypto.subtle.digest('SHA-256', data)
-  return Array.from(new Uint8Array(digest), (b) => b.toString(16).padStart(2, '0')).join('')
-}
-
-const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
-
+export interface UserDTO { id: number; name: string; email: string; role: AppUser['role']; is_active: boolean }
+export const userFromAPI = (u: UserDTO): AppUser => ({ id: String(u.id), name: u.name, email: u.email, role: u.role, active: u.is_active })
 export async function login(email: string, password: string): Promise<AppUser> {
-  const hash = await hashPassword(email, password)
-  return simulate(() => {
-    const user = db.users.find((u) => u.email.toLowerCase() === email.trim().toLowerCase())
-    const saved = user ? db.passwordHashes[user.id] : undefined
-    const valid = user !== undefined && (saved ? saved === hash : password === DEMO_PASSWORD)
-    if (!user || !valid) throw new ApiError('E-mail ou senha incorretos.', 401)
-    if (!user.active) throw new ApiError('Usuário inativo. Fale com o gestor.', 403)
-    return user
-  })
+  const session = await http.post<{ user: UserDTO; expires_at: string }>('/auth/login', { email, password })
+  return userFromAPI(session.user)
 }
-
-/**
- * Autocadastro. Toda conta nova nasce como Voluntário (o menor acesso);
- * só um gestor amplia o perfil, em Acessos e auditoria.
- */
 export async function register(input: { name: string; email: string; password: string }): Promise<AppUser> {
-  const hash = await hashPassword(input.email, input.password)
-  return simulate(() => {
-    const name = input.name.trim()
-    const email = input.email.trim().toLowerCase()
-    if (name.length < 3 || !EMAIL.test(email) || passwordProblem(input.password)) throw new ApiError('Dados do cadastro inválidos.', 422)
-    if (db.users.some((u) => u.email.toLowerCase() === email)) throw new ApiError('Já existe uma conta com este e-mail.', 409)
-    const user: AppUser = { id: nextId('U', db.users.map((u) => u.id), 1), name, email, role: 'volunteer', active: true }
-    db.users.push(user)
-    db.passwordHashes[user.id] = hash
-    persistUsers()
-    logAudit('Conta criada', user.id, user.name)
-    return user
-  })
+  await http.post('/auth/register', input)
+  try { return await login(input.email, input.password) }
+  catch (error) { throw new Error('Conta criada. Entre pela tela de login. ' + errorMessage(error)) }
 }
-
-/** Restaura a sessão a partir do id guardado no navegador. */
-export const me = (id: string): Promise<AppUser | null> =>
-  simulate(() => db.users.find((u) => u.id === id && u.active) ?? null)
+export const me = async (): Promise<AppUser> => userFromAPI(await http.get<UserDTO>('/auth/me'))
+export const logout = (): Promise<void> => http.post('/auth/logout')
+export const changePassword = (currentPassword: string, newPassword: string): Promise<void> =>
+  http.put('/auth/password', { current_password: currentPassword, password: newPassword })

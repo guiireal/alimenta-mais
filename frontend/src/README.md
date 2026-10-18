@@ -1,43 +1,32 @@
-# Alimenta+ ERP (front-end com dados mockados)
+# Frontend Alimenta+
 
-React 18, TypeScript, Vite, Tailwind CSS v4, React Router e TanStack Query.
+React 18, TypeScript, Vite, Tailwind, React Router e TanStack Query.
 
-```bash
-npm install
-npm run dev        # desenvolvimento
-npm run test       # testes (Vitest)
-npm run build      # checagem de tipos + build
+## Desenvolvimento
+
+Execute o Go na porta 8080 e `npm run dev` em frontend. Abra http://localhost:5173. O proxy do Vite atende `/api/v1`; não é necessário configurar uma URL externa.
+
+```text
+pages/       telas e formulários
+components/  UI, layout, guards e campos de lote compartilhados
+hooks/       consultas, mutations e invalidação de cache
+services/    HTTP, conversão de contratos e operações da API
+context/     sessão e avisos
+lib/         validadores, permissões, datas e CSV
 ```
 
-Entre com um dos perfis de demonstração na tela de login (senha `alimenta123`). Cada perfil enxerga e altera telas diferentes.
+Não há mocks em execução. O login consulta o servidor e restaura a sessão via `/auth/me`. O cliente HTTP envia cookies, usa apenas o cookie CSRF legível, coordena o refresh com uma promise e Web Locks entre abas e repete a requisição uma única vez após 401. Login/logout são sincronizados entre abas via BroadcastChannel, sem transmitir credenciais. Falhas de rede não são tratadas como logout.
 
-## Arquitetura
+Tokens e credenciais não ficam em localStorage. Os cookies de acesso e refresh são HttpOnly. As permissões da UI seguem administrator/manager/operator; a API repete todas as verificações.
 
-```
-src/
-  pages/        uma tela por arquivo (lazy), sem acesso direto a dados
-  components/   UI compartilhada, layout, guards de rota, diálogo, paginação, busca
-  hooks/        queries.ts: todas as leituras e escritas (TanStack Query)
-  services/     camada de dados. Hoje responde com um banco em memória (db.ts);
-                depois cada função troca `simulate(...)` por uma chamada em http.ts
-  context/      AuthContext (sessão e permissões) e ToastContext (avisos)
-  lib/          regras puras: validadores, permissões, formatadores, FEFO, CSV, hooks
-  data/mock.ts  dados iniciais
-```
+Quantidade e peso permanecem strings ao enviar formulários; números são convertidos apenas na apresentação de leituras. Categorias/produtos/depósitos vêm da API. O estoque tem paginação e ordenação no servidor; o CSV percorre todas as páginas do filtro. Doações permitem triagem e confirmação; rotas permitem incluir entregas com produtos, iniciar e confirmar a distribuição.
 
-## Responsabilidades do front-end cobertas
+A auditoria mostra os 100 eventos mais recentes. As demais listas simples percorrem páginas da API; se crescerem muito, substitua a listagem completa por paginação visível. O estoque já usa paginação visível.
 
-- **Roteamento e navegação:** rotas aninhadas, 404, tela de acesso negado, botões que levam a telas de formulário e detalhe, foco e rolagem ao trocar de tela.
-- **Sessão e permissões:** login, rota protegida, perfis (gestor, logística, voluntário, auditor) que mudam o menu, os botões e as rotas.
-- **Busca:** barra global com Enter para `/busca?q=...`, resultados agrupados e filtrados pelo perfil; filtros, ordenação e página do estoque ficam na URL.
-- **Dados:** cache, recarga após cada alteração, estados de carregamento, erro com nova tentativa e vazio.
-- **Formulários:** validação por campo, foco no primeiro erro, regras de negócio (perecível na câmara fria, validade obrigatória para item aprovado, consentimento LGPD).
-- **Feedback:** avisos (toast), confirmação em ações destrutivas, erros de servidor dentro do formulário.
-- **Acessibilidade e responsividade:** menu em gaveta no celular, tabelas com rolagem contida, rótulos e `aria-*`, link para pular ao conteúdo, respeito a `prefers-reduced-motion`.
-- **Resiliência:** ErrorBoundary por tela e tratamento de falha do `localStorage`.
+## Verificação e publicação
 
-## Ligando o backend
+`npm test` valida o cliente HTTP, login, renovação, tratamento de falhas, precisão dos envios, exportação e validadores. `npm run build` verifica os tipos e gera os arquivos estáticos.
 
-1. Defina `VITE_API_URL` (veja `.env.example`).
-2. Em cada arquivo de `src/services`, troque `simulate(() => ...)` por `http.get/post/patch(...)`. Os tipos de entrada e saída já estão em `src/types.ts`.
-3. Mantenha as validações no servidor: as do front só guiam o usuário, e a matriz de permissões do front não protege dados.
+Na publicação, configure um proxy HTTPS para `/api/v1` no mesmo host do frontend. O backend deve ter COOKIE_SECURE=true, ALLOWED_ORIGIN exata e JWT_SECRET própria. Navegadores antigos sem Web Locks podem disputar a rotação entre abas e exigir novo login.
+
+Consulte [o contrato](../../docs/api.md) e [a configuração do backend](../../backend/README.md).

@@ -81,6 +81,7 @@ Table donors {
 Table product_categories {
   id bigint [pk, increment]
   name varchar(100) [not null, unique]
+  is_perishable boolean [not null, default: false]
 }
 
 Table products {
@@ -100,6 +101,7 @@ Table warehouses {
   latitude decimal(9,6) [check: `latitude BETWEEN -90 AND 90`]
   longitude decimal(9,6) [check: `longitude BETWEEN -180 AND 180`]
   is_active boolean [not null, default: true]
+  is_cold_storage boolean [not null, default: false]
 
   checks {
     `(latitude IS NULL AND longitude IS NULL) OR (latitude IS NOT NULL AND longitude IS NOT NULL)`
@@ -230,6 +232,7 @@ Table deliveries {
   family_id bigint [ref: > families.id]
   partner_organization_id bigint [ref: > partner_organizations.id]
   route_id bigint [ref: > delivery_routes.id]
+  source_warehouse_id bigint [ref: > warehouses.id]
   stop_sequence integer [check: `stop_sequence > 0`]
   status delivery_status [not null, default: 'waiting']
   destination_address text [not null]
@@ -319,3 +322,33 @@ Table audit_logs {
     (actor_id, occurred_at)
   }
 }
+
+Table sessions {
+  id char(64) [pk]
+  user_id bigint [not null]
+  csrf_hash char(64) [not null]
+  expires_at timestamptz [not null]
+  created_at timestamptz [not null, default: `now()`]
+
+  indexes {
+    user_id
+    expires_at
+  }
+}
+
+Ref: sessions.user_id > users.id [delete: cascade]
+
+Table refresh_tokens {
+  token_hash char(64) [pk]
+  session_id char(64) [not null]
+  expires_at timestamptz [not null]
+  used_at timestamptz
+  created_at timestamptz [not null, default: `now()`]
+
+  indexes {
+    session_id
+    expires_at
+  }
+}
+
+Ref: refresh_tokens.session_id > sessions.id [delete: cascade]

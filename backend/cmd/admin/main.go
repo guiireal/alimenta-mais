@@ -21,7 +21,7 @@ func run() error {
 	}
 	defer db.Close()
 	auth := usecase.Auth{Tx: postgres.New(db), Passwords: security.Passwords{}}
-	return auth.Bootstrap(ctx, usecase.RegisterInput{Name: os.Getenv("ADMIN_NAME"), Email: os.Getenv("ADMIN_EMAIL"), Password: os.Getenv("ADMIN_PASSWORD")})
+	return auth.Bootstrap(ctx, usecase.RegisterInput{Name: os.Getenv("DEFAULT_ADMIN_NAME"), Email: os.Getenv("DEFAULT_ADMIN_EMAIL"), Password: os.Getenv("DEFAULT_ADMIN_PASSWORD")})
 }
 func main() {
 	if err := run(); err != nil {

@@ -52,11 +52,11 @@ O `.env` da raiz é exclusivo do Compose e não usa `backend/.env`. Os arquivos 
 Para criar o primeiro administrador, com a aplicação iniciada, defina as credenciais no PowerShell:
 
 ```powershell
-$env:ADMIN_NAME = 'Seu nome'
-$env:ADMIN_EMAIL = 'seu-email@example.com'
-$env:ADMIN_PASSWORD = 'SubstituaPorUmaSenha123'
-docker compose exec -e ADMIN_NAME -e ADMIN_EMAIL -e ADMIN_PASSWORD backend admin
-Remove-Item Env:ADMIN_PASSWORD
+$env:DEFAULT_ADMIN_NAME = 'Seu nome'
+$env:DEFAULT_ADMIN_EMAIL = 'seu-email@example.com'
+$env:DEFAULT_ADMIN_PASSWORD = 'SubstituaPorUmaSenha123'
+docker compose exec -e DEFAULT_ADMIN_NAME -e DEFAULT_ADMIN_EMAIL -e DEFAULT_ADMIN_PASSWORD backend admin
+Remove-Item Env:DEFAULT_ADMIN_PASSWORD
 ```
 
 Não há conta padrão. Também é possível usar `/cadastro` para criar uma conta de Operador.

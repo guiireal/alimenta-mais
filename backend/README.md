@@ -29,15 +29,21 @@ O servidor verifica a conexão com timeout de 5 segundos. Usa pool limitado, tim
 
 ## Administrador inicial
 
-Não existem contas ou senhas padrão. Em PowerShell, defina suas credenciais e execute:
+Não existem contas ou senhas padrão. Configure suas credenciais no `backend/.env`:
+
+```dotenv
+DEFAULT_ADMIN_NAME="Seu nome"
+DEFAULT_ADMIN_EMAIL=seu-email@example.com
+DEFAULT_ADMIN_PASSWORD="SubstituaPorUmaSenha123"
+```
+
+Execute dentro de `backend`, após aplicar as migrations:
 
 ```powershell
-$env:ADMIN_NAME = 'Seu nome'
-$env:ADMIN_EMAIL = 'seu-email@example.com'
-$env:ADMIN_PASSWORD = 'SubstituaPorUmaSenha123'
 go run ./cmd/admin
-Remove-Item Env:ADMIN_PASSWORD
 ```
+
+As variáveis também podem ser fornecidas pelo ambiente, com prioridade sobre o `.env`. Após a criação, remova `DEFAULT_ADMIN_PASSWORD` do arquivo. Alterar essas variáveis não modifica uma conta já criada; o servidor não executa esse comando automaticamente.
 
 O comando cria somente o primeiro administrador ativo, com auditoria e bloqueio transacional. Ele não promove nem sobrescreve uma conta existente. O autocadastro HTTP sempre cria `operator`.
 

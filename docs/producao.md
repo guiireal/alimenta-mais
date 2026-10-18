@@ -144,22 +144,25 @@ Se falhar, preserve o erro sem credenciais e investigue antes de iniciar o servi
 
 ## 6. Criar o primeiro administrador
 
-Execute uma única vez após as migrations. Forneça nome e e-mail reais; a senha deve ter pelo menos 8 caracteres, letras e números, e no máximo 72 bytes. O comando pede a senha sem exibi-la:
+Execute uma única vez após as migrations. Configure no `backend/.env` os valores reais das variáveis abaixo, preservando as demais configurações. A senha deve ter pelo menos 8 caracteres, letras e números, e no máximo 72 bytes:
+
+```dotenv
+DEFAULT_ADMIN_NAME="Seu nome"
+DEFAULT_ADMIN_EMAIL=seu-email@example.com
+DEFAULT_ADMIN_PASSWORD="Sua senha"
+```
+
+O comando carrega essas variáveis do `.env` automaticamente:
 
 ```bash
 (
   set -e
-  read -r -p 'Nome do administrador: ' ADMIN_NAME
-  read -r -p 'E-mail do administrador: ' ADMIN_EMAIL
-  read -r -s -p 'Senha do administrador: ' ADMIN_PASSWORD
-  printf '\n'
-  export ADMIN_NAME ADMIN_EMAIL ADMIN_PASSWORD
   cd /var/www/alimentamais.devgui.dev/backend
   /usr/local/lib/alimenta-mais/admin
 )
 ```
 
-Se o Hermes não tiver terminal interativo, obtenha essas informações por um canal seguro e injete as variáveis somente no processo de bootstrap. Não grave senha no guia, no histórico do shell ou em arquivo versionado.
+Se essas variáveis já estiverem configuradas no `.env`, use os valores existentes sem solicitar novamente. Não exponha o arquivo em logs ou relatórios. Após a criação, remova `DEFAULT_ADMIN_PASSWORD` do `.env`; o login passa a usar o cadastro salvo no banco. Alterar essas variáveis não atualiza uma conta existente. O servidor não cria o administrador automaticamente: execute o comando acima.
 
 O resultado esperado é `Administrador inicial criado`. Se já houver administrador ativo, o comando bloqueia uma segunda criação; preserve a conta existente. Não insira usuário diretamente por SQL. O cadastro público cria Operadores.
 

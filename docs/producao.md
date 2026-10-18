@@ -15,7 +15,7 @@ Roteiro para o Hermes Agent executar no servidor Linux, usando Bash como root. E
 
 ## Instruções para o Hermes
 
-Execute as etapas em ordem, confira o resultado e interrompa a sequência se um comando falhar. Inspecione o estado existente antes de modificar arquivos. Preserve os demais sites, serviços e certificados deste servidor. Não execute limpeza global, `git reset --hard`, migrations `down`, remoção de banco ou restauração automática de backup.
+Execute as etapas em ordem, confira o resultado e interrompa a sequência se um comando falhar. Inspecione o estado existente antes de modificar arquivos. Preserve os demais sites, serviços e certificados deste servidor. Não execute limpeza global, `git reset --hard`, migrations `down`, remoção de banco.
 
 As únicas informações pessoais necessárias são a senha atual do PostgreSQL e nome, e-mail e senha do primeiro administrador. Solicite somente o que ainda não estiver disponível de forma segura. Não publique credenciais, arquivos de ambiente ou cookies em logs, relatórios ou commits. Não habilite `set -x` nos comandos com segredos.
 
@@ -41,9 +41,9 @@ O frontend usa Node.js 22. O `backend/go.mod` declara **Go 1.27.0**: disponibili
 
 Se a porta 8080 estiver ocupada por outro serviço, escolha uma porta local livre e use o mesmo valor no ambiente, no proxy e nas verificações deste guia.
 
-Confira o site existente com `nginx -T` e os certificados com `certbot certificates`. Guarde uma cópia dos arquivos específicos que serão alterados fora de `/etc/nginx/conf.d`, para que o backup não seja carregado como outro site.
+Confira o site existente com `nginx -T` e os certificados com `certbot certificates`.
 
-## 2. Conferir e resguardar o banco já criado
+## 2. Conferir o banco já criado
 
 Use a conexão que já funcionou. A senha será solicitada pelo PostgreSQL:
 
@@ -61,16 +61,7 @@ SELECT current_database(), current_user;
 
 O banco já existe: **não execute `CREATE DATABASE` novamente**. As tabelas serão criadas pelas migrations do projeto, sem importar o DBML e sem executar os arquivos SQL manualmente.
 
-Antes das migrations, gere um backup, inclusive se o banco estiver vazio:
-
-```bash
-install -d -m 700 /var/backups/alimenta-mais
-pg_dump -U postgres -h localhost -W -Fc \
-  -f "/var/backups/alimenta-mais/alimenta_mais-$(date +%Y%m%d-%H%M%S).dump" \
-  alimenta_mais
-```
-
-Confirme o sucesso do comando e confira o arquivo com `pg_restore --list CAMINHO_DO_BACKUP`. Mantenha o backup restrito ao root. Se houver tabelas pré-existentes sem histórico compatível de migrations, analise a origem antes de aplicar: não apague tabelas nem marque migrations como executadas manualmente.
+Se houver tabelas pré-existentes sem histórico compatível de migrations, analise a origem antes de aplicar: não apague tabelas nem marque migrations como executadas manualmente.
 
 ## 3. Configurar o ambiente de produção
 
@@ -108,7 +99,7 @@ go build -trimpath -o /usr/local/lib/alimenta-mais/migrate.next ./cmd/migrate
 go build -trimpath -o /usr/local/lib/alimenta-mais/admin.next ./cmd/admin
 ```
 
-Após os três builds passarem, instale os executáveis. Em uma atualização, copie os executáveis anteriores para uma pasta de backup antes desta troca:
+Após os três builds passarem, instale os executáveis:
 
 ```bash
 mv /usr/local/lib/alimenta-mais/server.next /usr/local/lib/alimenta-mais/server
@@ -120,11 +111,11 @@ npm ci
 npm run build
 ```
 
-Confirme que `frontend/dist/index.html` existe e que o usuário worker do Nginx consegue ler o `dist` e atravessar seus diretórios pais. Ajuste apenas as permissões necessárias; não use `chmod -R 777`. Em atualizações, preserve o `dist` anterior antes de recompilar ou publique o novo build por troca de diretórios.
+Confirme que `frontend/dist/index.html` existe e que o usuário worker do Nginx consegue ler o `dist` e atravessar seus diretórios pais. Ajuste apenas as permissões necessárias; não use `chmod -R 777`.
 
 ## 5. Aplicar as migrations
 
-Na primeira instalação, a API ainda deve estar parada. Em atualizações, compile primeiro, faça backup e pare somente `alimenta-mais.service` antes de migrar.
+Na primeira instalação, a API ainda deve estar parada. Em atualizações, compile primeiro e pare somente `alimenta-mais.service` antes de migrar.
 
 Execute no diretório `backend` para carregar seu `.env` automaticamente:
 
@@ -311,13 +302,10 @@ Ao concluir, relate: commit publicado, migrations aplicadas, serviço ativo, res
 ## Próximas atualizações
 
 1. Confira alterações locais e atualize com `git pull --ff-only`.
-2. Compile os novos executáveis e frontend antes da troca; preserve os anteriores.
-3. Gere e confira backup do banco antes de migrar.
-4. Pare somente o serviço da aplicação, instale os novos executáveis e aplique `migrate up` com o ambiente de produção.
-5. Publique o novo frontend e reinicie o serviço; valide readiness, API e login.
-6. Preserve o ambiente e a chave JWT. Não repita bootstrap do administrador nem recrie o banco.
-
-Se uma atualização falhar, avalie compatibilidade do executável anterior com o schema antes de revertê-lo. Não restaure o banco automaticamente: isso pode descartar dados posteriores ao backup. Defina separadamente a rotina recorrente de backup e cópia externa, incluindo teste de restauração em ambiente isolado.
+2. Compile os novos executáveis e frontend antes da troca.
+3. Pare somente o serviço da aplicação, instale os novos executáveis e aplique `migrate up` com o ambiente de produção.
+4. Publique o novo frontend e reinicie o serviço; valide readiness, API e login.
+5. Preserve o ambiente e a chave JWT. Não repita bootstrap do administrador nem recrie o banco.
 
 ## Referências
 

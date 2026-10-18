@@ -74,13 +74,9 @@ Confirme o sucesso do comando e confira o arquivo com `pg_restore --list CAMINHO
 
 ## 3. Configurar o ambiente de produção
 
-Neste roteiro, as variáveis ficam em `/etc/alimenta-mais/backend.env`, fora da pasta pública e do Git. O systemd as repassa ao processo. Não é necessário configurar `.env` na raiz nem `backend/.env` para esta instalação.
+Use os arquivos já configurados em `backend/.env` e `frontend/.env`, preservando seus valores. Não crie cópias em `/etc`. O backend carrega `.env` automaticamente a partir do diretório de execução; o Vite carrega o ambiente do frontend no build. Não é necessário um `.env` na raiz nesta instalação.
 
-```bash
-install -d -m 700 /etc/alimenta-mais
-```
-
-Crie `/etc/alimenta-mais/backend.env` com o conteúdo abaixo, substituindo os dois campos indicados, sem sobrescrever segredos de uma instalação já existente:
+Confira se `backend/.env` contém as configurações de produção abaixo. Os campos indicados são exemplos: preserve as credenciais reais já configuradas.
 
 ```dotenv
 DATABASE_URL='postgres://postgres:SENHA_CODIFICADA_PARA_URL@localhost:5432/alimenta_mais?sslmode=disable'
@@ -90,13 +86,13 @@ JWT_SECRET=CHAVE_HEXADECIMAL_GERADA
 COOKIE_SECURE=true
 ```
 
-Use a senha atual de `postgres`. Codifique somente a senha com percent-encoding caso contenha caracteres reservados de URL, como `@`, `:`, `/`, `#`, `%` ou `?`. Por exemplo, `@` vira `%40`. Não mude a senha do banco. O arquivo deve continuar válido tanto como `EnvironmentFile` do systemd quanto para `source` no Bash; as aspas simples na URL protegem seus caracteres especiais.
+Use a senha atual de `postgres`. Codifique somente a senha com percent-encoding caso contenha caracteres reservados de URL, como `@`, `:`, `/`, `#`, `%` ou `?`. Por exemplo, `@` vira `%40`. Não mude a senha do banco. Não execute `source` no arquivo: use o carregamento dotenv já implementado pelo backend.
 
 Gere a chave JWT uma única vez com `openssl rand -hex 32` e grave-a no arquivo sem incluí-la no relatório. Preserve essa chave nas próximas publicações. `sslmode=disable` aqui pressupõe conexão com PostgreSQL na mesma máquina, via loopback; banco remoto exige configuração TLS própria.
 
 ```bash
-chown root:root /etc/alimenta-mais/backend.env
-chmod 600 /etc/alimenta-mais/backend.env
+chown root:root /var/www/alimentamais.devgui.dev/backend/.env
+chmod 600 /var/www/alimentamais.devgui.dev/backend/.env
 ```
 
 Não use a senha do PostgreSQL como chave JWT. Não exponha as portas 5432 ou 8080 para publicar o site. O uso de `postgres` segue a configuração solicitada; essa conta normalmente tem privilégios de superusuário no banco.
@@ -121,7 +117,7 @@ mv /usr/local/lib/alimenta-mais/admin.next /usr/local/lib/alimenta-mais/admin
 
 cd /var/www/alimentamais.devgui.dev/frontend
 npm ci
-VITE_API_URL=/api npm run build
+npm run build
 ```
 
 Confirme que `frontend/dist/index.html` existe e que o usuário worker do Nginx consegue ler o `dist` e atravessar seus diretórios pais. Ajuste apenas as permissões necessárias; não use `chmod -R 777`. Em atualizações, preserve o `dist` anterior antes de recompilar ou publique o novo build por troca de diretórios.
@@ -130,18 +126,15 @@ Confirme que `frontend/dist/index.html` existe e que o usuário worker do Nginx 
 
 Na primeira instalação, a API ainda deve estar parada. Em atualizações, compile primeiro, faça backup e pare somente `alimenta-mais.service` antes de migrar.
 
-O bloco usa um subshell para não manter as variáveis no terminal depois da execução:
+Execute no diretório `backend` para carregar seu `.env` automaticamente:
 
 ```bash
 (
   set -e
-  set -a
-  source /etc/alimenta-mais/backend.env
-  set +a
-  cd /usr/local/lib/alimenta-mais
-  ./migrate status
-  ./migrate up
-  ./migrate status
+  cd /var/www/alimentamais.devgui.dev/backend
+  /usr/local/lib/alimenta-mais/migrate status
+  /usr/local/lib/alimenta-mais/migrate up
+  /usr/local/lib/alimenta-mais/migrate status
 )
 ```
 
@@ -156,16 +149,13 @@ Execute uma única vez após as migrations. Forneça nome e e-mail reais; a senh
 ```bash
 (
   set -e
-  set -a
-  source /etc/alimenta-mais/backend.env
-  set +a
   read -r -p 'Nome do administrador: ' ADMIN_NAME
   read -r -p 'E-mail do administrador: ' ADMIN_EMAIL
   read -r -s -p 'Senha do administrador: ' ADMIN_PASSWORD
   printf '\n'
   export ADMIN_NAME ADMIN_EMAIL ADMIN_PASSWORD
-  cd /usr/local/lib/alimenta-mais
-  ./admin
+  cd /var/www/alimentamais.devgui.dev/backend
+  /usr/local/lib/alimenta-mais/admin
 )
 ```
 
@@ -192,8 +182,7 @@ After=network.target postgresql.service
 Type=simple
 User=alimenta-mais
 Group=alimenta-mais
-WorkingDirectory=/usr/local/lib/alimenta-mais
-EnvironmentFile=/etc/alimenta-mais/backend.env
+WorkingDirectory=/var/www/alimentamais.devgui.dev/backend
 ExecStart=/usr/local/lib/alimenta-mais/server
 Restart=on-failure
 RestartSec=5
@@ -207,7 +196,14 @@ UMask=0077
 WantedBy=multi-user.target
 ```
 
-O systemd lê o arquivo de ambiente como root antes de iniciar o processo com a conta indicada; não abra suas permissões para o usuário do serviço.
+O backend precisa ler seu `.env` ao iniciar. Após criar a conta Linux, permita leitura somente ao root e ao grupo do serviço, preservando o conteúdo:
+
+```bash
+chown root:alimenta-mais /var/www/alimentamais.devgui.dev/backend/.env
+chmod 640 /var/www/alimentamais.devgui.dev/backend/.env
+```
+
+Confirme que a conta do serviço consegue atravessar os diretórios pais. Confira `VITE_API_URL=/api` no ambiente existente do frontend antes do build. Não inclua credenciais do backend no frontend.
 
 ```bash
 systemctl daemon-reload

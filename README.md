@@ -72,6 +72,8 @@ Os dados ficam no volume `postgres_data`. **`docker compose down -v` apaga o ban
 
 ## Integração
 
+Para publicar no servidor com PostgreSQL, systemd, Nginx e Certbot, siga o [guia de produção para o Hermes Agent](docs/producao.md).
+
 Todas as telas usam a API e o PostgreSQL. Configure categorias, produtos e depósitos em **Cadastros** antes de registrar lotes ou doações. A triagem gera saldo apenas dos lotes aprovados; a confirmação disponibiliza a doação. Cadastre as famílias e registre o consentimento recebido antes de criar suas entregas.
 
 O login usa JWT de 15 minutos e refresh rotativo, com limite absoluto de 30 dias. Credenciais ficam em cookies HttpOnly; o cliente HTTP inclui CSRF nas escritas, renova a sessão após expiração e repete a chamada uma única vez. Logout revoga a sessão no servidor. Não há persistência de tokens, senhas ou dados demonstrativos no localStorage.

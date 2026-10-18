@@ -12,7 +12,7 @@ func TestSecureCookiePathsAndRemoval(t *testing.T) {
 	options := CookieOptions{Secure: true}
 	w := httptest.NewRecorder()
 	options.set(w, usecase.LoginResult{Token: "access", RefreshToken: "refresh", CSRFToken: "csrf", ExpiresAt: time.Now().Add(time.Minute), RefreshExpiresAt: time.Now().Add(time.Hour)})
-	paths := map[string]string{AccessCookie: "/api/v1", RefreshCookie: "/api/v1/auth", CSRFCookie: "/"}
+	paths := map[string]string{AccessCookie: "/api", RefreshCookie: "/api/auth", CSRFCookie: "/"}
 	for _, c := range w.Result().Cookies() {
 		if !c.Secure || c.Domain != "" || c.SameSite != http.SameSiteLaxMode || c.Path != paths[c.Name] || c.HttpOnly != (c.Name != CSRFCookie) {
 			t.Fatalf("cookie attributes: %+v", c)

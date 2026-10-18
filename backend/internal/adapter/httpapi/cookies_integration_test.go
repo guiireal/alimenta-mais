@@ -17,7 +17,7 @@ func (a *apiTest) browser(method, path string, body any, cookies []*http.Cookie,
 	if err != nil {
 		a.t.Fatal(err)
 	}
-	r := httptest.NewRequest(method, "/api/v1"+path, bytes.NewReader(data))
+	r := httptest.NewRequest(method, "/api"+path, bytes.NewReader(data))
 	r.RemoteAddr = "127.0.0.1:12345"
 	r.Header.Set("Content-Type", "application/json")
 	r.Header.Set("Origin", "http://localhost:5173")

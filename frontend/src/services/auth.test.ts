@@ -34,8 +34,8 @@ describe('API authentication', () => {
   it('registers through the API and authenticates the new operator', async () => {
     fetcher.mockResolvedValueOnce(json(user, 201)).mockResolvedValueOnce(json({ user: { ...user, role: 'operator' } }))
     expect((await register({ name: 'New User', email: 'new@example.test', password: 'Secret1234' })).role).toBe('operator')
-    expect(String(fetcher.mock.calls[0][0])).toContain('/api/v1/auth/register')
-    expect(String(fetcher.mock.calls[1][0])).toContain('/api/v1/auth/login')
+    expect(String(fetcher.mock.calls[0][0])).toContain('/api/auth/register')
+    expect(String(fetcher.mock.calls[1][0])).toContain('/api/auth/login')
   })
   it('shares one refresh and retries simultaneous expired requests only once, using the current CSRF cookie', async () => {
     let refreshed = false

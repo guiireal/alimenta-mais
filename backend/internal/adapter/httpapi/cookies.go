@@ -15,8 +15,8 @@ type CookieOptions struct{ Secure bool }
 
 func (c CookieOptions) set(w http.ResponseWriter, out usecase.LoginResult) {
 	for _, cookie := range []*http.Cookie{
-		{Name: AccessCookie, Value: out.Token, Path: "/api/v1", HttpOnly: true, Expires: out.ExpiresAt},
-		{Name: RefreshCookie, Value: out.RefreshToken, Path: "/api/v1/auth", HttpOnly: true, Expires: out.RefreshExpiresAt},
+		{Name: AccessCookie, Value: out.Token, Path: "/api", HttpOnly: true, Expires: out.ExpiresAt},
+		{Name: RefreshCookie, Value: out.RefreshToken, Path: "/api/auth", HttpOnly: true, Expires: out.RefreshExpiresAt},
 		{Name: CSRFCookie, Value: out.CSRFToken, Path: "/", Expires: out.RefreshExpiresAt},
 	} {
 		cookie.Secure = c.Secure
@@ -29,7 +29,7 @@ func (c CookieOptions) clear(w http.ResponseWriter) {
 	for _, v := range []struct {
 		name, path string
 		httpOnly   bool
-	}{{AccessCookie, "/api/v1", true}, {RefreshCookie, "/api/v1/auth", true}, {CSRFCookie, "/", false}} {
+	}{{AccessCookie, "/api", true}, {RefreshCookie, "/api/auth", true}, {CSRFCookie, "/", false}} {
 		http.SetCookie(w, &http.Cookie{Name: v.name, Path: v.path, HttpOnly: v.httpOnly, Secure: c.Secure, SameSite: http.SameSiteLaxMode, MaxAge: -1, Expires: time.Unix(1, 0)})
 	}
 }

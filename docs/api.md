@@ -1,6 +1,6 @@
 # API Alimenta+
 
-Base: `http://localhost:8080/api/v1`. HTTP nativo do Go. Respostas e corpos JSON usam `snake_case`; IDs são inteiros. Quantidades, pesos, coordenadas e indicadores decimais são strings, por exemplo `"12.500"`. Campos opcionais podem ser `null`.
+Base: `http://localhost:8080/api`. HTTP nativo do Go. Respostas e corpos JSON usam `snake_case`; IDs são inteiros. Quantidades, pesos, coordenadas e indicadores decimais são strings, por exemplo `"12.500"`. Campos opcionais podem ser `null`.
 
 Datas de calendário usam `YYYY-MM-DD`; instantes usam RFC3339 com timezone e são normalizados para UTC. As respostas de entidades seguem os campos de [`database.dbml`](database.dbml), com a senha/hash sempre omitida.
 
@@ -21,7 +21,7 @@ Datas de calendário usam `YYYY-MM-DD`; instantes usam RFC3339 com timezone e s�
 
 Login, autocadastro e refresh são públicos, com limite conjunto de 10 requisições por minuto por IP. As demais rotas exigem o cookie de acesso. Senhas precisam ter no mínimo 8 caracteres, no máximo 72 bytes, com letras e números. Não há recuperação de senha por e-mail neste contrato.
 
-O login/refresh envia `alimenta_access` (JWT de 15 minutos, HttpOnly, Path=/api/v1), `alimenta_refresh` (aleatório, rotativo, HttpOnly, Path=/api/v1/auth) e `alimenta_csrf` (legível pelo front, Path=/). Todos são host-only e SameSite=Lax, com Secure em HTTPS. Não há tokens no JSON ou localStorage. A sessão tem limite absoluto de 30 dias; renovar não estende esse limite.
+O login/refresh envia `alimenta_access` (JWT de 15 minutos, HttpOnly, Path=/api), `alimenta_refresh` (aleatório, rotativo, HttpOnly, Path=/api/auth) e `alimenta_csrf` (legível pelo front, Path=/). Todos são host-only e SameSite=Lax, com Secure em HTTPS. Não há tokens no JSON ou localStorage. A sessão tem limite absoluto de 30 dias; renovar não estende esse limite.
 
 Use `credentials: 'include'`. Em POST/PUT autenticados por cookie e no refresh, envie o valor de `alimenta_csrf` no header `X-CSRF-Token`. Ausência/valor inválido retorna 403. Reuso de refresh consumido revoga a sessão e retorna 401. Logout apaga os três cookies e revoga a sessão. Senha ou acesso alterado revoga todas as sessões daquele usuário.
 
@@ -72,7 +72,7 @@ Latitude e longitude devem ser informadas juntas; os intervalos são −90..90 e
 O consentimento da família tem endpoint próprio e não pode ser informado por timestamps arbitrários no cadastro:
 
 ```http
-PUT /api/v1/families/1/consent
+PUT /api/families/1/consent
 Content-Type: application/json
 Authorization: Bearer TOKEN
 
@@ -226,4 +226,4 @@ Criações e operações com corpo via POST retornam `201`; leituras, PUT, confi
 
 Erros da aplicação usam `401`, `403`, `404`, `409`, `422`, `413`, `429`, `500` ou `504`. Corpos precisam ser objetos JSON com `Content-Type: application/json`, limitados a 1 MiB, sem campos desconhecidos ou conteúdo adicional. Falhas internas não expõem SQL. O roteador nativo responde 404/405 para caminhos ou métodos não registrados.
 
-Fora da base `/api/v1`: `GET /` mantém o Hello World; `GET /health/live` verifica o processo e `GET /health/ready` verifica a conexão com PostgreSQL.
+Fora da base `/api`: `GET /` mantém o Hello World; `GET /health/live` verifica o processo e `GET /health/ready` verifica a conexão com PostgreSQL.

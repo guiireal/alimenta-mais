@@ -78,7 +78,7 @@ O login usa JWT de 15 minutos e refresh rotativo, com limite absoluto de 30 dias
 
 Perfis: Administrador, Gestor e Operador. O backend confere as permissões em todas as operações. Rotas exibem endereços e paradas reais; não há serviço externo de mapas ou veículos fictícios.
 
-Em produção, sirva frontend e `/api/v1` no **mesmo host HTTPS**, configure `ALLOWED_ORIGIN` exatamente e `COOKIE_SECURE=true`. `JWT_SECRET` deve ser aleatória, exclusiva do ambiente e ter ao menos 32 bytes. Nunca use a chave local em produção. Sem Web Locks, navegadores antigos podem encerrar a sessão se duas abas renovarem simultaneamente.
+Em produção, sirva frontend e `/api` no **mesmo host HTTPS**, configure `ALLOWED_ORIGIN` exatamente e `COOKIE_SECURE=true`. `JWT_SECRET` deve ser aleatória, exclusiva do ambiente e ter ao menos 32 bytes. Nunca use a chave local em produção. Sem Web Locks, navegadores antigos podem encerrar a sessão se duas abas renovarem simultaneamente.
 
 ## Arquitetura e verificações
 

@@ -263,7 +263,7 @@ func New(s Services, logger *slog.Logger, origin string, ready func(context.Cont
 		}
 		write(w, 200, map[string]string{"status": "ok"})
 	})
-	public("POST /api/v1/auth/register", func(w http.ResponseWriter, r *http.Request) error {
+	public("POST /api/auth/register", func(w http.ResponseWriter, r *http.Request) error {
 		var in usecase.RegisterInput
 		if err := decode(w, r, &in); err != nil {
 			return err
@@ -275,7 +275,7 @@ func New(s Services, logger *slog.Logger, origin string, ready func(context.Cont
 		write(w, 201, u)
 		return nil
 	})
-	public("POST /api/v1/auth/login", func(w http.ResponseWriter, r *http.Request) error {
+	public("POST /api/auth/login", func(w http.ResponseWriter, r *http.Request) error {
 		var in usecase.Credentials
 		if err := decode(w, r, &in); err != nil {
 			return err
@@ -288,7 +288,7 @@ func New(s Services, logger *slog.Logger, origin string, ready func(context.Cont
 		write(w, 200, out)
 		return nil
 	})
-	public("POST /api/v1/auth/refresh", func(w http.ResponseWriter, r *http.Request) error {
+	public("POST /api/auth/refresh", func(w http.ResponseWriter, r *http.Request) error {
 		out, err := s.Auth.Refresh(r.Context(), cookieValue(r, RefreshCookie), r.Header.Get("X-CSRF-Token"), remoteIP(r))
 		if err != nil {
 			if errors.Is(err, domain.ErrUnauthenticated) {
@@ -300,8 +300,8 @@ func New(s Services, logger *slog.Logger, origin string, ready func(context.Cont
 		write(w, 200, out)
 		return nil
 	})
-	private("GET /api/v1/auth/me", func(w http.ResponseWriter, r *http.Request) error { write(w, 200, actor(r).User); return nil })
-	private("POST /api/v1/auth/logout", func(w http.ResponseWriter, r *http.Request) error {
+	private("GET /api/auth/me", func(w http.ResponseWriter, r *http.Request) error { write(w, 200, actor(r).User); return nil })
+	private("POST /api/auth/logout", func(w http.ResponseWriter, r *http.Request) error {
 		if err := s.Auth.Logout(r.Context(), actor(r)); err != nil {
 			return err
 		}
@@ -309,7 +309,7 @@ func New(s Services, logger *slog.Logger, origin string, ready func(context.Cont
 		write(w, 204, nil)
 		return nil
 	})
-	private("PUT /api/v1/auth/password", func(w http.ResponseWriter, r *http.Request) error {
+	private("PUT /api/auth/password", func(w http.ResponseWriter, r *http.Request) error {
 		var in struct {
 			Current  string `json:"current_password"`
 			Password string `json:"password"`
@@ -325,7 +325,7 @@ func New(s Services, logger *slog.Logger, origin string, ready func(context.Cont
 		return nil
 	})
 	registerResources(private, s)
-	private("GET /api/v1/stock/stats", func(w http.ResponseWriter, r *http.Request) error {
+	private("GET /api/stock/stats", func(w http.ResponseWriter, r *http.Request) error {
 		out, err := s.Read.Stats(r.Context(), actor(r))
 		if err != nil {
 			return err
@@ -333,7 +333,7 @@ func New(s Services, logger *slog.Logger, origin string, ready func(context.Cont
 		write(w, 200, out)
 		return nil
 	})
-	private("GET /api/v1/stock/movements", func(w http.ResponseWriter, r *http.Request) error {
+	private("GET /api/stock/movements", func(w http.ResponseWriter, r *http.Request) error {
 		q, err := query(r)
 		if err != nil {
 			return err
@@ -345,7 +345,7 @@ func New(s Services, logger *slog.Logger, origin string, ready func(context.Cont
 		write(w, 200, out)
 		return nil
 	})
-	private("GET /api/v1/batches/{id}/movements", func(w http.ResponseWriter, r *http.Request) error {
+	private("GET /api/batches/{id}/movements", func(w http.ResponseWriter, r *http.Request) error {
 		id, err := pathID(r)
 		if err != nil {
 			return err
@@ -361,7 +361,7 @@ func New(s Services, logger *slog.Logger, origin string, ready func(context.Cont
 		write(w, 200, out)
 		return nil
 	})
-	private("GET /api/v1/search", func(w http.ResponseWriter, r *http.Request) error {
+	private("GET /api/search", func(w http.ResponseWriter, r *http.Request) error {
 		out, err := s.Read.Search(r.Context(), actor(r), strings.TrimSpace(r.URL.Query().Get("q")))
 		if err != nil {
 			return err
@@ -369,8 +369,8 @@ func New(s Services, logger *slog.Logger, origin string, ready func(context.Cont
 		write(w, 200, out)
 		return nil
 	})
-	private("GET /api/v1/reports", reportEndpoint(s, false))
-	private("GET /api/v1/dashboard", reportEndpoint(s, true))
+	private("GET /api/reports", reportEndpoint(s, false))
+	private("GET /api/dashboard", reportEndpoint(s, true))
 	return middleware(mux, logger, origin)
 }
 func reportEndpoint(s Services, dashboard bool) endpoint {

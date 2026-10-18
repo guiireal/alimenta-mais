@@ -4,7 +4,7 @@ React 18, TypeScript, Vite, Tailwind, React Router e TanStack Query.
 
 ## Desenvolvimento
 
-Execute o Go na porta 8080 e `npm run dev` em frontend. Abra http://localhost:5173. O proxy do Vite atende `/api/v1`; não é necessário configurar uma URL externa.
+Execute o Go na porta 8080 e `npm run dev` em frontend. Abra http://localhost:5173. O proxy do Vite atende `/api`; não é necessário configurar uma URL externa.
 
 ```text
 pages/       telas e formulários
@@ -27,6 +27,6 @@ A auditoria mostra os 100 eventos mais recentes. As demais listas simples percor
 
 `npm test` valida o cliente HTTP, login, renovação, tratamento de falhas, precisão dos envios, exportação e validadores. `npm run build` verifica os tipos e gera os arquivos estáticos.
 
-Na publicação, configure um proxy HTTPS para `/api/v1` no mesmo host do frontend. O backend deve ter COOKIE_SECURE=true, ALLOWED_ORIGIN exata e JWT_SECRET própria. Navegadores antigos sem Web Locks podem disputar a rotação entre abas e exigir novo login.
+Na publicação, configure um proxy HTTPS para `/api` no mesmo host do frontend. O backend deve ter COOKIE_SECURE=true, ALLOWED_ORIGIN exata e JWT_SECRET própria. Navegadores antigos sem Web Locks podem disputar a rotação entre abas e exigir novo login.
 
 Consulte [o contrato](../../docs/api.md) e [a configuração do backend](../../backend/README.md).

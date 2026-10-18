@@ -67,7 +67,7 @@ func (a *apiTest) request(method, path string, body any) *httptest.ResponseRecor
 		}
 		input = bytes.NewReader(data)
 	}
-	r := httptest.NewRequest(method, "/api/v1"+path, input)
+	r := httptest.NewRequest(method, "/api"+path, input)
 	r.RemoteAddr = "127.0.0.1:12345"
 	r.Header.Set("Content-Type", "application/json")
 	if a.token != "" {
@@ -219,7 +219,7 @@ func TestAuthenticationAndBoundaries(t *testing.T) {
 	if strings.Contains(w.Body.String(), "password") || strings.Contains(w.Body.String(), "$2a$") {
 		t.Fatal("resposta contém senha ou hash")
 	}
-	r := httptest.NewRequest("POST", "/api/v1/auth/login", strings.NewReader(`{"email":"one"} {"email":"two"}`))
+	r := httptest.NewRequest("POST", "/api/auth/login", strings.NewReader(`{"email":"one"} {"email":"two"}`))
 	r.Header.Set("Content-Type", "application/json")
 	w = httptest.NewRecorder()
 	a.handler.ServeHTTP(w, r)

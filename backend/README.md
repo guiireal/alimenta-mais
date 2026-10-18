@@ -110,4 +110,4 @@ Sem `TEST_DATABASE_URL`, os testes de integração são pulados explicitamente. 
 
 Há testes de migração/rollback, autenticação, permissões, JSON, CORS, limite de requisições, sigilo de credenciais, triagem, refrigeração, consentimento, FEFO, devoluções, indicadores, rollback de operações e baixas simultâneas. O teste de corrida exige suporte de C/C++ para o Go na máquina.
 
-O [contrato da API](../docs/api.md) detalha rotas, formatos e os três perfis. O front-end já consome esse contrato por um cliente HTTP com cookies e renovação automática. No desenvolvimento, inicie o Vite em http://localhost:5173 e o Go na porta 8080. Em produção, publique o front e o caminho /api/v1 sob o mesmo host HTTPS; o cookie CSRF precisa estar disponível no host do front.
+O [contrato da API](../docs/api.md) detalha rotas, formatos e os três perfis. O front-end já consome esse contrato por um cliente HTTP com cookies e renovação automática. No desenvolvimento, inicie o Vite em http://localhost:5173 e o Go na porta 8080. Em produção, publique o front e o caminho /api sob o mesmo host HTTPS; o cookie CSRF precisa estar disponível no host do front.

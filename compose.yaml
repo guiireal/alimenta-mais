@@ -1,0 +1,44 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: alimenta_mais
+      POSTGRES_USER: alimenta
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Defina POSTGRES_PASSWORD no .env da raiz}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U alimenta -d alimenta_mais"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  backend:
+    build: ./backend
+    environment:
+      DATABASE_URL: postgres://alimenta:${POSTGRES_PASSWORD:?Defina POSTGRES_PASSWORD no .env da raiz}@postgres:5432/alimenta_mais?sslmode=disable
+      JWT_SECRET: ${JWT_SECRET:?Defina JWT_SECRET no .env da raiz}
+      HTTP_ADDR: :8080
+      ALLOWED_ORIGIN: http://localhost:5173
+      COOKIE_SECURE: "false"
+    command: ["/bin/sh", "-c", "migrate up && exec server"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:8080/health/ready"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+
+  frontend:
+    build: ./frontend
+    ports:
+      - "127.0.0.1:5173:80"
+    depends_on:
+      backend:
+        condition: service_healthy
+
+volumes:
+  postgres_data:

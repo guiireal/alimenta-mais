@@ -28,6 +28,48 @@ Abra **http://localhost:5173**. O proxy do Vite encaminha `/api` ao Go na porta 
 
 Entre com uma conta existente. Não há contas ou senhas de demonstração no código. O administrador inicial pode ser criado por `go run ./cmd/admin`, seguindo [backend/README.md](backend/README.md). Contas criadas em `/cadastro` começam como Operador; o Administrador altera os acessos.
 
+## Executar com Docker
+
+Requer Docker com Compose e containers Linux (no Windows, Docker Desktop iniciado). Não é necessário instalar Go, Node.js ou PostgreSQL na máquina.
+
+Na raiz do projeto, copie `.env.example` para `.env` e preencha `POSTGRES_PASSWORD` e `JWT_SECRET` com valores aleatórios diferentes. Use valores hexadecimais para evitar caracteres reservados na URL do banco; a chave JWT deve ter pelo menos 32 bytes. Em PowerShell 7, este comando gera um valor de 64 caracteres; execute duas vezes, uma para cada variável:
+
+```powershell
+[Convert]::ToHexString([Security.Cryptography.RandomNumberGenerator]::GetBytes(32))
+```
+
+```powershell
+# Somente na primeira configuração:
+Copy-Item .env.example .env
+# Preencha as duas variáveis no .env antes de continuar.
+docker compose up -d --build
+```
+
+Abra **http://localhost:5173**. O Compose compila as imagens do front-end e backend, inicia o PostgreSQL **16** e aplica as migrations pendentes antes de iniciar a API. O Nginx serve o front compilado, atende URLs internas da aplicação e encaminha `/api` e `/health` ao backend. Banco e API ficam acessíveis somente na rede interna do Compose; apenas o front é publicado no localhost.
+
+O `.env` da raiz é exclusivo do Compose e não usa `backend/.env`. Os arquivos `.env` não entram nas imagens. Este Compose é para execução local via HTTP; a publicação em produção exige HTTPS e os ajustes de origem e cookies descritos abaixo.
+
+Para criar o primeiro administrador, com a aplicação iniciada, defina as credenciais no PowerShell:
+
+```powershell
+$env:ADMIN_NAME = 'Seu nome'
+$env:ADMIN_EMAIL = 'seu-email@example.com'
+$env:ADMIN_PASSWORD = 'SubstituaPorUmaSenha123'
+docker compose exec -e ADMIN_NAME -e ADMIN_EMAIL -e ADMIN_PASSWORD backend admin
+Remove-Item Env:ADMIN_PASSWORD
+```
+
+Não há conta padrão. Também é possível usar `/cadastro` para criar uma conta de Operador.
+
+```powershell
+docker compose logs -f                  # Acompanhar os serviços
+docker compose exec backend migrate status
+docker compose down                     # Parar, preservando o banco
+docker compose up -d --build             # Recompilar e iniciar após mudanças
+```
+
+Os dados ficam no volume `postgres_data`. **`docker compose down -v` apaga o banco e todos os seus dados.** Alterar `POSTGRES_PASSWORD` no `.env` não altera a senha de um banco já inicializado; mantenha o valor ou altere a senha também no PostgreSQL.
+
 ## Integração
 
 Todas as telas usam a API e o PostgreSQL. Configure categorias, produtos e depósitos em **Cadastros** antes de registrar lotes ou doações. A triagem gera saldo apenas dos lotes aprovados; a confirmação disponibiliza a doação. Cadastre as famílias e registre o consentimento recebido antes de criar suas entregas.
